@@ -2,8 +2,21 @@
   <dictionary name="SoapClancy">
     <words>
       <w>ampds</w>
+      <w>bivariate</w>
+      <w>dashdot</w>
+      <w>dashdotdotted</w>
+      <w>dashdotted</w>
+      <w>datasets</w>
       <w>dataverse</w>
+      <w>edgecolor</w>
+      <w>elec</w>
+      <w>facecolor</w>
       <w>gmcm</w>
+      <w>linestyle</w>
+      <w>linestyles</w>
+      <w>ncol</w>
+      <w>ukdale</w>
+      <w>visulisation</w>
     </words>
   </dictionary>
 </component>
