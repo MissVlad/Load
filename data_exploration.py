@@ -7,22 +7,12 @@ from typing import Tuple
 import copy
 from matplotlib import pyplot as plt
 from Ploting.adjust_Func import reassign_linestyles_recursively_in_ax, adjust_legend_in_ax
-from Ploting.fast_plot_Func import series, time_series
+from Ploting.fast_plot_Func import series, time_series, scatter, hist
 import datetime
 from dateutil import tz
 from project_path_Var import project_path_
 import os
-
-
-def fraction_of_energy_consumption_for_one_dataset(meter_group: MeterGroup):
-    fraction = meter_group.submeters().fraction_per_meter().dropna()
-
-
-def __fraction_of_energy_consumption_for_all_datasets(datasets: Tuple[DataSet, ...]):
-    for this_dataset in datasets:
-        for this_building in this_dataset.buildings.values():
-            elec = this_building.elec  # type: MeterGroup
-            fraction_of_energy_consumption_for_one_dataset(elec)
+from Time_Processing.SynchronousTimeSeriesData_Class import merge_two_time_series_df
 
 
 def plot_active_power_for_meter_group(meter_group: MeterGroup, sample_period=60, **kwargs):
@@ -47,31 +37,128 @@ def plot_active_power_for_meter_group(meter_group: MeterGroup, sample_period=60,
     return ax_
 
 
+def get_category_and_consumption(meter_group: MeterGroup):
+    """
+    得到一个MeterGroup中的所有子表的能量消耗量，能量消耗比例，名字和分类
+    :param meter_group:
+    :return:
+    """
+    # 比例
+    fraction = meter_group.submeters().fraction_per_meter().dropna()
+    fraction_df = pd.DataFrame(fraction * 100, columns=['fraction'])
+    # 能量
+    energy = meter_group.submeters().energy_per_meter().transpose()['active']
+    energy_df = pd.DataFrame(energy)
+    # 能量和比例
+    energy_fraction_df = pd.DataFrame(['{:.2f}, {:.2f} %'.format(energy_df.values.flatten()[i],
+                                                                 fraction_df.values.flatten()[i])
+                                       for i in range(fraction.size)],
+                                      columns=['energy_fraction_str'],
+                                      index=fraction.index)
+    # 名字和分类
+    name = []
+    category = []
+    for i in range(fraction.index.__len__()):
+        name.append(meter_group.submeters()[fraction.index[i]].appliances[0].metadata['original_name'])
+        category.append(meter_group.submeters()[fraction.index[i]].appliances[0].type.get('categories'))
+    name_df = pd.DataFrame(name, index=fraction.index, columns=['name'])
+    category_df = pd.DataFrame(category, index=fraction.index)
+    category_df.reindex(columns=pd.MultiIndex.from_product([['category'], category_df.columns]))
+    # merge导出csv
+    final = pd.concat((name_df, energy_df, fraction_df, category_df, energy_fraction_df), axis=1)
+    final.to_csv(project_path_ + '/Report/Energies paper/{}_get_category_and_consumption.csv'.format(
+        meter_group.meters[0].identifier.dataset
+    ))
+    return final
+
+
 def energies_paper_one_day_visulisation_for_ampds2_dataset():
     def one_day_visulisation(this_dataset, start, end):
         this_dataset.set_window(start=start, end=end)
         elec = this_dataset.buildings[1].elec  # type: MeterGroup
         _ax = plot_active_power_for_meter_group(elec, x_axis_format="%H", tz=tz.gettz('Canada/Pacific'))
         adjust_legend_in_ax(_ax, protocol='Outside center left', ncol=3)
-        _ax.set_xlabel('Time (hour of a day, time zone: Pacific Time Zone)')
+        _ax.set_xlabel('Time (hour of a day, time zone: America/Vancouver)')
         return _ax
 
     # ampds2_dataset
-    # ax = one_day_visulisation(ampds2_dataset, "2013-02-06", "2013-02-07")
-    # plt.savefig(os.path.join(project_path_,
-    #                          'Report/ampds2_dataset_2013-02-06.svg'))
-    # ax = one_day_visulisation(ampds2_dataset, "2013-08-07", "2013-08-08")
-    # plt.savefig(os.path.join(project_path_,
-    #                          'Report/ampds2_dataset_2013-08-07.svg'))
+    ax = one_day_visulisation(ampds2_dataset, "2013-02-06", "2013-02-07")
+    plt.savefig(os.path.join(project_path_,
+                             'Report/ampds2_dataset_2013-02-06.svg'))
+    ax = one_day_visulisation(ampds2_dataset, "2013-08-07", "2013-08-08")
+    plt.savefig(os.path.join(project_path_,
+                             'Report/ampds2_dataset_2013-08-07.svg'))
 
-    # temperature correlation
-    site_df = next(ampds2_dataset.buildings[1].elec.mains().load(ac_type='active', sample_period=60))
-    site_df.join(pd.DataFrame)
-    ampds2_weather_df = load_ampds2_weather()
-    merge = pd.merge(site_df, ampds2_weather_df, right_index=True, left_index=True)
-    tt=1
+
+def energies_paper_correlation_exploration_for_ampds2_dataset():
+    _ampds2_weather_df = load_ampds2_weather()
+    # %% main
+    mains_df = next(ampds2_dataset.buildings[1].elec.mains().load(ac_type='active', sample_period=60))
+
+    mains_weather_df_merged = merge_two_time_series_df(mains_df, _ampds2_weather_df)
+    # 温度
+    # scatter(mains_weather_df_merged['temperature'].values,
+    #         mains_weather_df_merged[('power', 'active')].values,
+    #         c=mains_weather_df_merged.index.month.values,
+    #         cmap='hsv', alpha=0.5,
+    #         x_label='Temperature ($^\circ$C)',
+    #         y_label='WHE active power (W)',
+    #         color_bar_name='Month',
+    #         save_file_=project_path_ + 'Report/temperature_WOE', save_format='svg')
+
+    # 光照
+    # scatter(mains_weather_df_merged['solar irradiation'].values,
+    #         mains_weather_df_merged[('power', 'active')].values,
+    #         c=mains_weather_df_merged.index.hour.values,
+    #         cmap='hsv', alpha=0.5,
+    #         x_label='Solar irradiation (W/m$\mathregular{^{2}}$)',
+    #         y_label='WHE active power (W)',
+    #         color_bar_name='Hour',
+    #         save_file_=project_path_ + 'Report/solar irradiation_WOE', save_format='svg')
+
+    # %% heating和lighting
+    heating_category = next(ampds2_dataset.buildings[1].elec.select_using_appliances(category='heating').load(
+        ac_type='active',
+        physical_quantity='power',
+        sample_period=60))
+    heating_category_weather_df_merged = merge_two_time_series_df(heating_category, _ampds2_weather_df)
+    # scatter(heating_category_weather_df_merged['temperature'].values,
+    #         heating_category_weather_df_merged[('power', 'active')].values,
+    #         c=heating_category_weather_df_merged.index.month.values,
+    #         cmap='hsv', alpha=0.5,
+    #         x_label='Temperature ($^\circ$C)',
+    #         y_label='Heating category active power (W)',
+    #         color_bar_name='Month',
+    #         save_file_=project_path_ + 'Report/temperature_heating', save_format='svg')
+
+    lighting_category = next(ampds2_dataset.buildings[1].elec.select_using_appliances(category='lighting').load(
+        ac_type='active',
+        physical_quantity='power',
+        sample_period=60))
+    lighting_category_weather_df_merged = merge_two_time_series_df(lighting_category, _ampds2_weather_df)
+    scatter(lighting_category_weather_df_merged['solar irradiation'].values,
+            lighting_category_weather_df_merged[('power', 'active')].values,
+            c=lighting_category_weather_df_merged.index.hour.values,
+            cmap='hsv', alpha=0.5,
+            x_label='Solar irradiation (W/m$\mathregular{^{2}}$)',
+            y_label='Lighting category active power (W)',
+            color_bar_name='Hour',
+            save_file_=project_path_ + 'Report/solar irradiation_lighting', save_format='svg')
+    # flag = np.bitwise_and(lighting_category_weather_df_merged[('power', 'active')].values > 20,
+    #                       lighting_category_weather_df_merged['solar irradiation'].values < 10)
+
+
+def energies_paper_get_category_and_consumption_for_ampds2_dataset():
+    elec = ampds2_dataset.buildings[1].elec
+    get_category_and_consumption(elec)
+
+
+def energies_paper():
+    # energies_paper_one_day_visulisation_for_ampds2_dataset()
+    energies_paper_correlation_exploration_for_ampds2_dataset()
+    # energies_paper_get_category_and_consumption_for_ampds2_dataset()
 
 
 if __name__ == '__main__':
     ampds2_dataset, refit_dataset, uk_dale_dataset = load_datasets()
-    energies_paper_one_day_visulisation_for_ampds2_dataset()
+    energies_paper()

@@ -3,6 +3,7 @@
     <words>
       <w>ampds</w>
       <w>bivariate</w>
+      <w>circ</w>
       <w>dashdot</w>
       <w>dashdotdotted</w>
       <w>dashdotted</w>
@@ -14,6 +15,8 @@
       <w>gmcm</w>
       <w>linestyle</w>
       <w>linestyles</w>
+      <w>mathregular</w>
+      <w>merra</w>
       <w>ncol</w>
       <w>ukdale</w>
       <w>visulisation</w>

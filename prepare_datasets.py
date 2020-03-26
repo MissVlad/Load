@@ -16,14 +16,21 @@ DATASET_ROOT_DIRECTORY = r'E:\OneDrive_Extra\Database\Load_Disaggregation'
 
 def load_ampds2_weather():
     _path = os.path.join(DATASET_ROOT_DIRECTORY,
-                         'AMPds2\\dataverse_files\\')
+                         r'AMPds2/MERRA2/')
     if not os.path.exists(_path + "weather.pkl"):
-        reading = pd.read_csv(_path + 'Climate_HourlyWeather.csv',
-                              sep=',')
-        read_results = pd.DataFrame(index=pd.DatetimeIndex(reading['Date/Time'],
-                                                           tz=tz.gettz('America/Vancouver'),
-                                                           ambiguous='NaT'),
-                                    data={'temperature': reading['Temp (C)'].values})
+        read_results = pd.DataFrame()
+        for file in ('2012.csv', '2013.csv', '2014.csv'):
+            reading = pd.read_csv(_path + file,
+                                  sep=',',
+                                  skiprows=3)
+            read_results = pd.concat((read_results,
+                                      pd.DataFrame(index=pd.DatetimeIndex(reading['local_time']),
+                                                   data={'temperature': reading['temperature'].values,
+                                                         'solar irradiation': reading['radiation_surface'].values,
+                                                         'precipitation': reading['precipitation'].values,
+                                                         'air density': reading['air_density'].values})
+                                      ))
+        read_results = read_results.loc[~read_results.index.duplicated()]
         read_results.to_pickle(_path + "weather.pkl")
     else:
         read_results = pd.read_pickle(_path + "weather.pkl")  # type: pd.DataFrame
@@ -56,3 +63,4 @@ def load_datasets():
 
 if __name__ == '__main__':
     ampds2_dataset, refit_dataset, uk_dale_dataset = load_datasets()
+    # load_ampds2_weather()
