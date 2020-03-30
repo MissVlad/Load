@@ -2,24 +2,39 @@
   <dictionary name="SoapClancy">
     <words>
       <w>ampds</w>
+      <w>backprop</w>
       <w>bivariate</w>
       <w>circ</w>
+      <w>cuda</w>
       <w>dashdot</w>
       <w>dashdotdotted</w>
       <w>dashdotted</w>
       <w>datasets</w>
       <w>dataverse</w>
+      <w>dtype</w>
       <w>edgecolor</w>
       <w>elec</w>
       <w>facecolor</w>
       <w>gmcm</w>
+      <w>hlines</w>
       <w>linestyle</w>
       <w>linestyles</w>
       <w>mathregular</w>
+      <w>mdates</w>
       <w>merra</w>
+      <w>mnist</w>
+      <w>nbins</w>
       <w>ncol</w>
+      <w>preds</w>
+      <w>relu</w>
+      <w>softmax</w>
       <w>ukdale</w>
       <w>visulisation</w>
+      <w>vlines</w>
+      <w>xmax</w>
+      <w>xmin</w>
+      <w>ymax</w>
+      <w>ymin</w>
     </words>
   </dictionary>
 </component>
