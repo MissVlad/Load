@@ -4,6 +4,7 @@ from nilmtk.dataset_converters.refit.convert_refit import convert_refit
 from nilmtk.utils import print_dict
 import os
 from File_Management.path_and_file_management_Func import try_to_find_file
+from File_Management.load_save_Func import load_exist_pkl_file_otherwise_run_and_save
 import pandas as pd
 import numpy as np
 from numpy import ndarray
@@ -13,18 +14,13 @@ import csv
 from dateutil import tz
 from typing import Tuple
 from FFT_Class import FFTProcessor
+import copy
+from torch.utils.data import Dataset as TorchDataSet, DataLoader as TorchDataLoader
+import torch
+from pathlib import Path
+from Time_Processing.datetime_utils import datetime_one_hot_encoder
 
 DATASET_ROOT_DIRECTORY = r'E:\OneDrive_Extra\Database\Load_Disaggregation'
-
-
-def load_ampds2_mains_fft():
-    """
-    载入ampds2的mains的fft之后的结果
-    :return: (mains原序列，power，phase)
-    """
-    mains = next(ampds2_dataset.buildings[1].elec.mains().load(physical_quantity='power', ac_type='active'))
-    fft_processor = FFTProcessor(mains.values.flatten(), 60)
-    return fft_processor
 
 
 def load_ampds2_weather():
@@ -86,11 +82,85 @@ def load_datasets():
     return _ampds2_dataset, _refit_dataset, _uk_dale_dataset
 
 
+def get_training_set_test_set_for_ampds2_dataset() -> Tuple[MeterGroup, MeterGroup]:
+    """
+    从ampds2_dataset中分离出training set和test set，
+    只考虑building 1
+    2012-4-1 0:00到2013-4-1 0:00 是training set
+    2013-4-1 0:00到2014-4-1 0:00 是test set
+    :return:
+    """
+    training_set, _, _ = load_datasets()
+    test_set, _, _ = load_datasets()
+    # training_set, test_set = copy.deepcopy(ampds2_dataset_), copy.deepcopy(ampds2_dataset_)
+    # del ampds2_dataset_
+    training_set.set_window(end='2013-4-1')
+    training_set = training_set.buildings[1].elec
+    test_set.set_window(start='2013-4-1')
+    test_set = test_set.buildings[1].elec
+    return training_set, test_set
+
+
+class TorchDataset(TorchDataSet):
+    """
+    专门针对PyTorch的模型的Dataset
+    """
+
+    def __init__(self, data: pd.DataFrame,
+                 transform_args: pd.DataFrame = None,
+                 transform_args_file_path: Path = None):
+        """
+        :param data 所有数据，包括x和y，形如下面的一个pd.DataFrame
+                time_var   temperature  solar irradiation   precipitation   air density   mains_var   appliance_var
+        .
+        .
+        .
+        TODO: solar/moon
+        :param transform_args: 形如下面的一个pd.DataFrame
+                  temperature  solar irradiation   precipitation   air density   mains_var   appliance_var
+
+        minimum
+        maximum
+        :param transform_args_file_path
+        """
+        self.data = data  # type: pd.DataFrame
+        self.transform_args = transform_args or self.get_transform_args(transform_args_file_path)
+
+    def __getitem__(self, index):
+        # 全部用one-hot-encoder和z-score的方法去normalise数据
+        data_x = torch.tensor(self.transform('x').values)  # type: torch.tensor
+        data_y = torch.tensor(self.transform('y').values)  # type: torch.tensor
+        return data_x[index], data_y[index]
+
+    def __len__(self):
+        return self.data.__len__()
+
+    def transform(self, for_x_or_y='x'):
+        if for_x_or_y == 'x':
+            time_var_transformed = datetime_one_hot_encoder(self.data['time_var'].values)
+            for this_col in self.transform_args.columns:
+                pass
+            return
+        else:
+            return
+
+    def get_transform_args(self, file_path: Path) -> pd.DataFrame:
+        """
+        根据self.weather_var, self.main_var, self.appliance_var，载入 OR 计算并保存min-max变换需要的参数
+        """
+        if not file_path:
+            raise Exception('Should specify file_path')
+
+        @load_exist_pkl_file_otherwise_run_and_save(file_path)
+        def func() -> pd.DataFrame:
+            transform_args = pd.DataFrame(index=('minimum', 'maximum'),
+                                          columns=self.data.columns.drop('time_var'))
+            for i in transform_args.columns:
+                transform_args[i] = (np.nanmin(self.data[i].values), np.nanmax(self.data[i].values))
+            return transform_args
+
+        return func
+
+
 if __name__ == '__main__':
     ampds2_dataset, refit_dataset, uk_dale_dataset = load_datasets()
-    # load_ampds2_weather()
-    fft_results = load_ampds2_mains_fft()
-    series(fft_results.single_sided_frequency_axis, fft_results.single_sided_amplitude_spectrum)
-    series(fft_results.single_sided_period_axis(), fft_results.single_sided_amplitude_spectrum)
-    series(fft_results.single_sided_period_axis('minute'), fft_results.single_sided_amplitude_spectrum)
-    series(fft_results.single_sided_period_axis('hour'), fft_results.single_sided_amplitude_spectrum)

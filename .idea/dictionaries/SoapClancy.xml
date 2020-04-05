@@ -9,24 +9,33 @@
       <w>dashdot</w>
       <w>dashdotdotted</w>
       <w>dashdotted</w>
+      <w>dataloader</w>
       <w>datasets</w>
       <w>dataverse</w>
       <w>dtype</w>
       <w>edgecolor</w>
       <w>elec</w>
       <w>facecolor</w>
+      <w>fhmm</w>
       <w>gmcm</w>
       <w>hlines</w>
       <w>linestyle</w>
       <w>linestyles</w>
+      <w>lstm</w>
       <w>mathregular</w>
+      <w>matlab</w>
       <w>mdates</w>
       <w>merra</w>
       <w>mnist</w>
       <w>nbins</w>
       <w>ncol</w>
+      <w>ndarray</w>
+      <w>nilm</w>
+      <w>nilmtk</w>
+      <w>optim</w>
       <w>preds</w>
       <w>relu</w>
+      <w>scaler</w>
       <w>softmax</w>
       <w>ukdale</w>
       <w>visulisation</w>
