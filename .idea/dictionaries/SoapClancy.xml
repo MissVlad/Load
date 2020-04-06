@@ -12,6 +12,7 @@
       <w>dataloader</w>
       <w>datasets</w>
       <w>dataverse</w>
+      <w>dateutil</w>
       <w>dtype</w>
       <w>edgecolor</w>
       <w>elec</w>
@@ -19,6 +20,7 @@
       <w>fhmm</w>
       <w>gmcm</w>
       <w>hlines</w>
+      <w>isoweekday</w>
       <w>linestyle</w>
       <w>linestyles</w>
       <w>lstm</w>
@@ -32,8 +34,10 @@
       <w>ndarray</w>
       <w>nilm</w>
       <w>nilmtk</w>
+      <w>onehot</w>
       <w>optim</w>
       <w>preds</w>
+      <w>pytorch</w>
       <w>relu</w>
       <w>scaler</w>
       <w>softmax</w>

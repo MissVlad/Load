@@ -4,7 +4,7 @@ from numpy import ndarray
 from pandas import DataFrame
 from Ploting.fast_plot_Func import *
 from project_path_Var import project_path_
-from prepare_datasets import load_datasets, get_training_set_test_set_for_ampds2_dataset, TorchDataset, \
+from prepare_datasets import get_training_set_test_set_for_ampds2_dataset, NILMTorchDataset, \
     load_ampds2_weather
 from nilmtk.legacy.disaggregate import CombinatorialOptimisation, FHMM
 import time
@@ -17,12 +17,14 @@ from Time_Processing.SynchronousTimeSeriesData_Class import merge_two_time_serie
 
 def energies_paper_prepare_dataset_for_torch_model_for_ampds2_dataset(appliance_original_name: str):
     """
-
+    返回专门针对pytorch的nn模型的dataset
     :param appliance_original_name: 可选['HPE', 'FRE', 'CDE']
-    :return:
     """
     training_set, test_set = get_training_set_test_set_for_ampds2_dataset()
     torch_sets = []
+    transform_args_file_path = Path(project_path_) / 'Data/Results/Energies_paper/Ampds2/transform_args_{}.pkl'.format(
+        appliance_original_name)
+    # 生成training set和test set对应的TorchDataset对象
     for this_set in (training_set, test_set):
         # appliance_var
         appliance_df = next(this_set.select_using_appliances(original_name=[appliance_original_name]).meters[0].load(
@@ -44,8 +46,8 @@ def energies_paper_prepare_dataset_for_torch_model_for_ampds2_dataset(appliance_
         # 组装成TorchDataset对象需要的data
         data = pd.concat((time_df, mains_weather_df_merged, appliance_df), axis=1)
         # 生成TorchDataset对象
-        torch_sets.append(TorchDataset(data,
-                                       Path('')))
+        # 注意transform_args.pkl的命名方式，这样让training set和test set共用一组参数，由training set决定，因为loop中它在先
+        torch_sets.append(NILMTorchDataset(data, transform_args_file_path=transform_args_file_path))
     return tuple(torch_sets)
 
 
@@ -81,5 +83,5 @@ def energies_paper_train_nilm_models_for_ampds2_dataset(top_n: int = 3):
 
 
 if __name__ == '__main__':
-    energies_paper_train_nilm_models_for_ampds2_dataset()
+    # energies_paper_train_nilm_models_for_ampds2_dataset()
     energies_paper_prepare_dataset_for_torch_model_for_ampds2_dataset('HPE')

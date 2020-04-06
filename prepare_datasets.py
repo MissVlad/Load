@@ -18,7 +18,8 @@ import copy
 from torch.utils.data import Dataset as TorchDataSet, DataLoader as TorchDataLoader
 import torch
 from pathlib import Path
-from Time_Processing.datetime_utils import datetime_one_hot_encoder
+from Time_Processing.datetime_utils import DatetimeOnehotEncoder
+from workalendar.america import Canada
 
 DATASET_ROOT_DIRECTORY = r'E:\OneDrive_Extra\Database\Load_Disaggregation'
 
@@ -92,8 +93,6 @@ def get_training_set_test_set_for_ampds2_dataset() -> Tuple[MeterGroup, MeterGro
     """
     training_set, _, _ = load_datasets()
     test_set, _, _ = load_datasets()
-    # training_set, test_set = copy.deepcopy(ampds2_dataset_), copy.deepcopy(ampds2_dataset_)
-    # del ampds2_dataset_
     training_set.set_window(end='2013-4-1')
     training_set = training_set.buildings[1].elec
     test_set.set_window(start='2013-4-1')
@@ -101,7 +100,7 @@ def get_training_set_test_set_for_ampds2_dataset() -> Tuple[MeterGroup, MeterGro
     return training_set, test_set
 
 
-class TorchDataset(TorchDataSet):
+class NILMTorchDataset(TorchDataSet):
     """
     专门针对PyTorch的模型的Dataset
     """
@@ -128,21 +127,28 @@ class TorchDataset(TorchDataSet):
 
     def __getitem__(self, index):
         # 全部用one-hot-encoder和z-score的方法去normalise数据
-        data_x = torch.tensor(self.transform('x').values)  # type: torch.tensor
-        data_y = torch.tensor(self.transform('y').values)  # type: torch.tensor
-        return data_x[index], data_y[index]
+        transformed_x_y = self.transform(index)
+        data_x = torch.tensor(transformed_x_y[0].values)  # type: torch.tensor
+        data_y = torch.tensor(transformed_x_y[-1].values)  # type: torch.tensor
+        return data_x, data_y
 
     def __len__(self):
         return self.data.__len__()
 
-    def transform(self, for_x_or_y='x'):
-        if for_x_or_y == 'x':
-            time_var_transformed = datetime_one_hot_encoder(self.data['time_var'].values)
-            for this_col in self.transform_args.columns:
-                pass
-            return
-        else:
-            return
+    def transform(self, index=None) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        datetime_onehot_encoder = DatetimeOnehotEncoder()
+        time_var_transformed = datetime_onehot_encoder(self.data['time_var'].values[index],
+                                                       tz=self.data['time_var'][0].tz,
+                                                       country=Canada())
+        other_var_transformed = pd.DataFrame(columns=self.transform_args.columns)
+        for this_col in self.transform_args.columns:
+            other_var_transformed.loc[:, this_col] = (self.data.loc[:, this_col].iloc[index] -
+                                                      self.transform_args.loc['minimum', this_col]) / (
+                                                             self.transform_args.loc['maximum', this_col] -
+                                                             self.transform_args.loc['minimum', this_col])
+        transformed_x_y = pd.concat(
+            (time_var_transformed, other_var_transformed.reset_index().drop('TIMESTAMP', axis=1)), axis=1)
+        return transformed_x_y.iloc[:, :-1], transformed_x_y.iloc[:, -1]
 
     def get_transform_args(self, file_path: Path) -> pd.DataFrame:
         """
