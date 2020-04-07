@@ -13,6 +13,9 @@ from File_Management.path_and_file_management_Func import try_to_find_file
 from Regression_Analysis.DeepLearning_Class import SimpleLSTM, BayesCOVN1DLSTM
 from nilmtk import MeterGroup
 from Time_Processing.SynchronousTimeSeriesData_Class import merge_two_time_series_df
+from torch.utils.data import DataLoader
+import torch
+from torch.nn.functional import mse_loss
 
 
 def energies_paper_prepare_dataset_for_torch_model_for_ampds2_dataset(appliance_original_name: str):
@@ -22,8 +25,9 @@ def energies_paper_prepare_dataset_for_torch_model_for_ampds2_dataset(appliance_
     """
     training_set, test_set = get_training_set_test_set_for_ampds2_dataset()
     torch_sets = []
-    transform_args_file_path = Path(project_path_) / 'Data/Results/Energies_paper/Ampds2/transform_args_{}.pkl'.format(
-        appliance_original_name)
+    _path = Path(project_path_) / 'Data/Results/Energies_paper/Ampds2/'
+    transform_args_file_path = _path / 'transform_args_{}.pkl'.format(appliance_original_name)
+    transformed_data_file_path = _path / 'transformed_data_file_path_{}.pkl'.format(appliance_original_name)
     # 生成training set和test set对应的TorchDataset对象
     for this_set in (training_set, test_set):
         # appliance_var
@@ -47,8 +51,47 @@ def energies_paper_prepare_dataset_for_torch_model_for_ampds2_dataset(appliance_
         data = pd.concat((time_df, mains_weather_df_merged, appliance_df), axis=1)
         # 生成TorchDataset对象
         # 注意transform_args.pkl的命名方式，这样让training set和test set共用一组参数，由training set决定，因为loop中它在先
-        torch_sets.append(NILMTorchDataset(data, transform_args_file_path=transform_args_file_path))
+        torch_sets.append(NILMTorchDataset(data,
+                                           sequence_length=60 * 24,
+                                           transform_args_file_path=transform_args_file_path,
+                                           transformed_data_file_path=transformed_data_file_path))
     return tuple(torch_sets)
+
+
+def energies_paper_train_torch_model_for_ampds2_dataset(appliance_original_name: str):
+    ############################################################
+    epoch_num = 1
+    training_torch_set_dl_bs = 4
+    hidden_size = 128
+    learning_rate = 1e-4
+    #############################################################
+    training_torch_set = energies_paper_prepare_dataset_for_torch_model_for_ampds2_dataset(appliance_original_name)[0]
+    training_torch_set_dl = DataLoader(training_torch_set,
+                                       batch_size=training_torch_set_dl_bs,
+                                       shuffle=False)
+    # validation_torch_set_dl = DataLoader(training_torch_set, batch_size=training_torch_set_dl_bs * 2, shuffle=False)
+    # %% 定义模型
+    simple_lstm_model = SimpleLSTM(input_size=training_torch_set[0][0].size()[-1],
+                                   hidden_size=hidden_size,
+                                   output_size=training_torch_set[0][1].size()[-1])
+    # %% 定义优化器
+    opt = torch.optim.Adam(simple_lstm_model.parameters(), lr=learning_rate)
+    # %% 定义loss函数
+    loss_func = mse_loss
+    # %% 开始train和validate
+    for _ in range(epoch_num):
+        simple_lstm_model.train()
+        for index, (xb, yb) in enumerate(training_torch_set_dl):
+            pred = simple_lstm_model(xb)
+            loss = loss_func(pred, yb)
+            loss.backward()
+            opt.step()
+            opt.zero_grad()
+            print(f"第{index + 1: d}个batch, loss={loss}")
+
+        # simple_lstm_model.eval()
+        # with torch.no_grad():
+        #     valid_loss = sum(loss_func(simple_lstm_model(xb, yb) for xb, yb in validation_torch_set_dl))
 
 
 def energies_paper_train_nilm_models_for_ampds2_dataset(top_n: int = 3):
@@ -84,4 +127,4 @@ def energies_paper_train_nilm_models_for_ampds2_dataset(top_n: int = 3):
 
 if __name__ == '__main__':
     # energies_paper_train_nilm_models_for_ampds2_dataset()
-    energies_paper_prepare_dataset_for_torch_model_for_ampds2_dataset('HPE')
+    energies_paper_train_torch_model_for_ampds2_dataset('HPE')

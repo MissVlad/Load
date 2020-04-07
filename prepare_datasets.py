@@ -106,8 +106,11 @@ class NILMTorchDataset(TorchDataSet):
     """
 
     def __init__(self, data: pd.DataFrame,
+                 sequence_length: int,
+                 over_lapping: bool = False,
                  transform_args: pd.DataFrame = None,
-                 transform_args_file_path: Path = None):
+                 transform_args_file_path: Path = None,
+                 transformed_data_file_path: Path = None):
         """
         :param data 所有数据，包括x和y，形如下面的一个pd.DataFrame
                 time_var   temperature  solar irradiation   precipitation   air density   mains_var   appliance_var
@@ -121,34 +124,57 @@ class NILMTorchDataset(TorchDataSet):
         minimum
         maximum
         :param transform_args_file_path
+        :param transformed_data_file_path 相当于一个缓存。因为有的转换特别花时间，如果先前直接全部转换好，存到硬盘中，
+        到时候直接载入就好
         """
         self.data = data  # type: pd.DataFrame
-        self.transform_args = transform_args or self.get_transform_args(transform_args_file_path)
+        self.sequence_length = sequence_length  # type: int
+        self.over_lapping = over_lapping
+        self.transform_args = transform_args or self.get_transform_args(transform_args_file_path)  # type: pd.DataFrame
+        self.transformed_data_file_path = transformed_data_file_path
 
-    def __getitem__(self, index):
-        # 全部用one-hot-encoder和z-score的方法去normalise数据
+    def __getitem__(self, index: int):
+        # 全部用one-hot-encoder和min-max的方法去normalise数据
         transformed_x_y = self.transform(index)
-        data_x = torch.tensor(transformed_x_y[0].values)  # type: torch.tensor
-        data_y = torch.tensor(transformed_x_y[-1].values)  # type: torch.tensor
+        data_x = torch.tensor(transformed_x_y[0].values,
+                              device='cuda:0',
+                              dtype=torch.float)  # type: torch.tensor
+        data_y = torch.tensor(transformed_x_y[-1].values,
+                              device='cuda:0',
+                              dtype=torch.float)  # type: torch.tensor
         return data_x, data_y
 
     def __len__(self):
-        return self.data.__len__()
+        if self.over_lapping:
+            return self.data.__len__() - self.sequence_length + 1
+        else:
+            return int(self.data.__len__() / self.sequence_length)
 
-    def transform(self, index=None) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    def transform(self, index: int) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        if self.over_lapping:
+            index_slice = slice(index, index + self.sequence_length)
+        else:
+            index_slice = slice(index * self.sequence_length, (index + 1) * self.sequence_length)
         datetime_onehot_encoder = DatetimeOnehotEncoder()
-        time_var_transformed = datetime_onehot_encoder(self.data['time_var'].values[index],
+        time_var_transformed = datetime_onehot_encoder(self.data['time_var'].values[index_slice],
                                                        tz=self.data['time_var'][0].tz,
                                                        country=Canada())
         other_var_transformed = pd.DataFrame(columns=self.transform_args.columns)
         for this_col in self.transform_args.columns:
-            other_var_transformed.loc[:, this_col] = (self.data.loc[:, this_col].iloc[index] -
+            other_var_transformed.loc[:, this_col] = (self.data.loc[:, this_col].iloc[index_slice] -
                                                       self.transform_args.loc['minimum', this_col]) / (
                                                              self.transform_args.loc['maximum', this_col] -
                                                              self.transform_args.loc['minimum', this_col])
         transformed_x_y = pd.concat(
             (time_var_transformed, other_var_transformed.reset_index().drop('TIMESTAMP', axis=1)), axis=1)
-        return transformed_x_y.iloc[:, :-1], transformed_x_y.iloc[:, -1]
+        return transformed_x_y.iloc[:, :-1], transformed_x_y.iloc[:, [-1]]
+
+    def transform_all_data_and_save(self):
+        @load_exist_pkl_file_otherwise_run_and_save(self.transformed_data_file_path)
+        def func():
+            return
+
+        return func
 
     def get_transform_args(self, file_path: Path) -> pd.DataFrame:
         """
