@@ -4,7 +4,7 @@ from nilmtk.dataset_converters.refit.convert_refit import convert_refit
 from nilmtk.utils import print_dict
 import os
 from File_Management.path_and_file_management_Func import try_to_find_file
-from File_Management.load_save_Func import load_exist_pkl_file_otherwise_run_and_save
+from File_Management.load_save_Func import load_exist_pkl_file_otherwise_run_and_save, load_pkl_file, save_pkl_file
 import pandas as pd
 import numpy as np
 from numpy import ndarray
@@ -19,7 +19,6 @@ from torch.utils.data import Dataset as TorchDataSet, DataLoader as TorchDataLoa
 import torch
 from pathlib import Path
 from Time_Processing.datetime_utils import DatetimeOnehotEncoder
-from workalendar.america import Canada
 
 DATASET_ROOT_DIRECTORY = r'E:\OneDrive_Extra\Database\Load_Disaggregation'
 
@@ -106,19 +105,20 @@ class NILMTorchDataset(TorchDataSet):
     """
 
     def __init__(self, data: pd.DataFrame,
+                 *, country=None,
                  sequence_length: int,
                  over_lapping: bool = False,
-                 transform_args: pd.DataFrame = None,
                  transform_args_file_path: Path = None,
                  transformed_data_file_path: Path = None):
         """
         :param data 所有数据，包括x和y，形如下面的一个pd.DataFrame
-                time_var   temperature  solar irradiation   precipitation   air density   mains_var   appliance_var
+                           temperature  solar irradiation   precipitation   air density   mains_var   appliance_var
+        time_stamp_index
         .
         .
         .
         TODO: solar/moon
-        :param transform_args: 形如下面的一个pd.DataFrame
+        transform_args: 形如下面的一个pd.DataFrame
                   temperature  solar irradiation   precipitation   air density   mains_var   appliance_var
 
         minimum
@@ -130,12 +130,23 @@ class NILMTorchDataset(TorchDataSet):
         self.data = data  # type: pd.DataFrame
         self.sequence_length = sequence_length  # type: int
         self.over_lapping = over_lapping
-        self.transform_args = transform_args or self.get_transform_args(transform_args_file_path)  # type: pd.DataFrame
+        self.country = country
+        self.transform_args = self.get_transform_args(transform_args_file_path)  # type: pd.DataFrame
         self.transformed_data_file_path = transformed_data_file_path
 
     def __getitem__(self, index: int):
-        # 全部用one-hot-encoder和min-max的方法去normalise数据
-        transformed_x_y = self.transform(index)
+        # 决定索引的位置
+        if self.over_lapping:
+            index_slice = slice(index, index + self.sequence_length)
+        else:
+            index_slice = slice(index * self.sequence_length, (index + 1) * self.sequence_length)
+        # 如果有完整的数据就直接载入
+        if try_to_find_file(self.transformed_data_file_path):
+            transformed_x, transformed_y = load_pkl_file(
+                self.transformed_data_file_path)  # type: pd.DataFrame, pd.DataFrame
+            transformed_x_y = (transformed_x.iloc[index_slice], transformed_y.iloc[index_slice])
+        else:
+            transformed_x_y = self.transform(index_slice)
         data_x = torch.tensor(transformed_x_y[0].values,
                               device='cuda:0',
                               dtype=torch.float)  # type: torch.tensor
@@ -150,18 +161,21 @@ class NILMTorchDataset(TorchDataSet):
         else:
             return int(self.data.__len__() / self.sequence_length)
 
-    def transform(self, index: int) -> Tuple[pd.DataFrame, pd.DataFrame]:
-        if self.over_lapping:
-            index_slice = slice(index, index + self.sequence_length)
+    def transform(self, index=None,
+                  datetime_onehot_encoder_results_file_path: Path = None) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        # 决定索引的位置
+        index = index or slice(self.data.shape[0])
+        # 如果有完整的time_var的数据就直接载入
+        if try_to_find_file(datetime_onehot_encoder_results_file_path):
+            time_var_transformed = load_pkl_file(datetime_onehot_encoder_results_file_path)
+            time_var_transformed = time_var_transformed[index]
         else:
-            index_slice = slice(index * self.sequence_length, (index + 1) * self.sequence_length)
-        datetime_onehot_encoder = DatetimeOnehotEncoder()
-        time_var_transformed = datetime_onehot_encoder(self.data['time_var'].values[index_slice],
-                                                       tz=self.data['time_var'][0].tz,
-                                                       country=Canada())
+            datetime_onehot_encoder = DatetimeOnehotEncoder()
+            time_var_transformed = datetime_onehot_encoder(self.data.index[index],
+                                                           country=self.country)
         other_var_transformed = pd.DataFrame(columns=self.transform_args.columns)
         for this_col in self.transform_args.columns:
-            other_var_transformed.loc[:, this_col] = (self.data.loc[:, this_col].iloc[index_slice] -
+            other_var_transformed.loc[:, this_col] = (self.data.loc[:, this_col].iloc[index] -
                                                       self.transform_args.loc['minimum', this_col]) / (
                                                              self.transform_args.loc['maximum', this_col] -
                                                              self.transform_args.loc['minimum', this_col])
@@ -169,10 +183,14 @@ class NILMTorchDataset(TorchDataSet):
             (time_var_transformed, other_var_transformed.reset_index().drop('TIMESTAMP', axis=1)), axis=1)
         return transformed_x_y.iloc[:, :-1], transformed_x_y.iloc[:, [-1]]
 
-    def transform_all_data_and_save(self):
+    def transform_all_data_and_save(self, datetime_onehot_encoder_results_file_path: Path):
         @load_exist_pkl_file_otherwise_run_and_save(self.transformed_data_file_path)
-        def func():
-            return
+        def func() -> Tuple[pd.DataFrame, pd.DataFrame]:
+            datetime_onehot_encoder = DatetimeOnehotEncoder()
+            time_var_transformed = datetime_onehot_encoder(self.data.index,
+                                                           country=self.country)
+            save_pkl_file(datetime_onehot_encoder_results_file_path, time_var_transformed)
+            return self.transform(datetime_onehot_encoder_results_file_path)
 
         return func
 

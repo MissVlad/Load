@@ -16,6 +16,7 @@ from Time_Processing.SynchronousTimeSeriesData_Class import merge_two_time_serie
 from torch.utils.data import DataLoader
 import torch
 from torch.nn.functional import mse_loss
+from workalendar.america import Canada
 
 
 def energies_paper_prepare_dataset_for_torch_model_for_ampds2_dataset(appliance_original_name: str):
@@ -26,10 +27,9 @@ def energies_paper_prepare_dataset_for_torch_model_for_ampds2_dataset(appliance_
     training_set, test_set = get_training_set_test_set_for_ampds2_dataset()
     torch_sets = []
     _path = Path(project_path_) / 'Data/Results/Energies_paper/Ampds2/'
-    transform_args_file_path = _path / 'transform_args_{}.pkl'.format(appliance_original_name)
-    transformed_data_file_path = _path / 'transformed_data_file_path_{}.pkl'.format(appliance_original_name)
+    transform_args_file_path = _path / 'transform_args_{}.pkl'.format(appliance_original_name)  # 只与用电器有关
     # 生成training set和test set对应的TorchDataset对象
-    for this_set in (training_set, test_set):
+    for i, this_set in enumerate((training_set, test_set)):
         # appliance_var
         appliance_df = next(this_set.select_using_appliances(original_name=[appliance_original_name]).meters[0].load(
             ac_type='active', sample_period=60)).droplevel('physical_quantity', axis=1)  # type: DataFrame
@@ -38,23 +38,27 @@ def energies_paper_prepare_dataset_for_torch_model_for_ampds2_dataset(appliance_
         mains_df = next(this_set.mains().load(
             ac_type='active', sample_period=60)).droplevel('physical_quantity', axis=1)  # type: DataFrame
         mains_df.rename(columns={mains_df.columns[0]: 'mains_var'}, inplace=True)
-        # time_var
-        time_df = pd.DataFrame(mains_df.index.to_list(),
-                               index=mains_df.index,
-                               columns=['time_var'])
         # weather_var
         ampds2_weather_df = load_ampds2_weather()
         mains_weather_df_merged = merge_two_time_series_df(mains_df, ampds2_weather_df)
         mains_weather_df_merged = mains_weather_df_merged.reindex(columns=mains_weather_df_merged.columns[1:].append(
             mains_weather_df_merged.columns[slice(1)]))
         # 组装成TorchDataset对象需要的data
-        data = pd.concat((time_df, mains_weather_df_merged, appliance_df), axis=1)
+        data = pd.concat((mains_weather_df_merged, appliance_df), axis=1)
         # 生成TorchDataset对象
         # 注意transform_args.pkl的命名方式，这样让training set和test set共用一组参数，由training set决定，因为loop中它在先
+        # 注意transformed_data_file，用电器和training/set有关
+        transformed_data_file_path = _path / f"transformed_data_{appliance_original_name}_" \
+                                             f"{'training' if i == 0 else 'test'}.pkl"
         torch_sets.append(NILMTorchDataset(data,
                                            sequence_length=60 * 24,
                                            transform_args_file_path=transform_args_file_path,
-                                           transformed_data_file_path=transformed_data_file_path))
+                                           transformed_data_file_path=transformed_data_file_path,
+                                           country=Canada()))
+        # 注意datetime_onehot_encoder_results_file，只与training/set有关
+        datetime_onehot_encoder_results_file_path = _path / f"datetime_onehot_encoder_results_" \
+                                                            f"{'training' if i == 0 else 'test'}.pkl"
+        torch_sets[-1].transform_all_data_and_save(datetime_onehot_encoder_results_file_path)
     return tuple(torch_sets)
 
 
