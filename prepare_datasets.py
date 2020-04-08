@@ -184,13 +184,16 @@ class NILMTorchDataset(TorchDataSet):
         return transformed_x_y.iloc[:, :-1], transformed_x_y.iloc[:, [-1]]
 
     def transform_all_data_and_save(self, datetime_onehot_encoder_results_file_path: Path):
-        @load_exist_pkl_file_otherwise_run_and_save(self.transformed_data_file_path)
-        def func() -> Tuple[pd.DataFrame, pd.DataFrame]:
+        if not try_to_find_file(datetime_onehot_encoder_results_file_path):
             datetime_onehot_encoder = DatetimeOnehotEncoder()
             time_var_transformed = datetime_onehot_encoder(self.data.index,
                                                            country=self.country)
             save_pkl_file(datetime_onehot_encoder_results_file_path, time_var_transformed)
-            return self.transform(datetime_onehot_encoder_results_file_path)
+
+        @load_exist_pkl_file_otherwise_run_and_save(self.transformed_data_file_path)
+        def func() -> Tuple[pd.DataFrame, pd.DataFrame]:
+            return self.transform(datetime_onehot_encoder_results_file_path=
+                                  datetime_onehot_encoder_results_file_path)
 
         return func
 
