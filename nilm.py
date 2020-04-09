@@ -46,27 +46,20 @@ def energies_paper_prepare_dataset_for_torch_model_for_ampds2_dataset(appliance_
         # 组装成TorchDataset对象需要的data
         data = pd.concat((mains_weather_df_merged, appliance_df), axis=1)
         # 生成TorchDataset对象
-        # 注意transform_args.pkl的命名方式，这样让training set和test set共用一组参数，由training set决定，因为loop中它在先
-        # 注意transformed_data_file，用电器和training/set有关
-        transformed_data_file_path = _path / f"transformed_data_{appliance_original_name}_" \
-                                             f"{'training' if i == 0 else 'test'}.pkl"
+        # 注意transform_args.pkl的命名方式，这样让training set和test set共用一组参数，只与用电器有关,
+        # 由training set决定，因为loop中它在先
         torch_sets.append(NILMTorchDataset(data,
                                            sequence_length=60 * 24,
                                            transform_args_file_path=transform_args_file_path,
-                                           transformed_data_file_path=transformed_data_file_path,
                                            country=Canada()))
-        # 注意datetime_onehot_encoder_results_file，只与training/set有关
-        datetime_onehot_encoder_results_file_path = _path / f"datetime_onehot_encoder_results_" \
-                                                            f"{'training' if i == 0 else 'test'}.pkl"
-        torch_sets[-1].transform_all_data_and_save(datetime_onehot_encoder_results_file_path)
     return tuple(torch_sets)
 
 
 def energies_paper_train_torch_model_for_ampds2_dataset(appliance_original_name: str):
     ############################################################
     epoch_num = 1
-    training_torch_set_dl_bs = 4
-    hidden_size = 128
+    training_torch_set_dl_bs = 32
+    hidden_size = 1024
     learning_rate = 1e-4
     #############################################################
     training_torch_set = energies_paper_prepare_dataset_for_torch_model_for_ampds2_dataset(appliance_original_name)[0]
@@ -78,6 +71,7 @@ def energies_paper_train_torch_model_for_ampds2_dataset(appliance_original_name:
     simple_lstm_model = SimpleLSTM(input_size=training_torch_set[0][0].size()[-1],
                                    hidden_size=hidden_size,
                                    output_size=training_torch_set[0][1].size()[-1])
+    # simple_lstm_model = torch.nn.DataParallel(simple_lstm_model, device_ids=[0]).cuda()  # 将模型转为cuda类型
     # %% 定义优化器
     opt = torch.optim.Adam(simple_lstm_model.parameters(), lr=learning_rate)
     # %% 定义loss函数
@@ -87,7 +81,7 @@ def energies_paper_train_torch_model_for_ampds2_dataset(appliance_original_name:
         simple_lstm_model.train()
         for index, (xb, yb) in enumerate(training_torch_set_dl):
             pred = simple_lstm_model(xb)
-            loss = loss_func(pred, yb)
+            loss = loss_func(pred, yb).cuda()
             loss.backward()
             opt.step()
             opt.zero_grad()

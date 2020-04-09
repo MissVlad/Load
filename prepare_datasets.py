@@ -103,13 +103,14 @@ class NILMTorchDataset(TorchDataSet):
     """
     专门针对PyTorch的模型的Dataset
     """
+    __slots__ = ('data', 'transformed_data', 'sequence_length', 'over_lapping', 'country')
 
     def __init__(self, data: pd.DataFrame,
-                 *, country=None,
+                 *, country,
                  sequence_length: int,
                  over_lapping: bool = False,
-                 transform_args_file_path: Path = None,
-                 transformed_data_file_path: Path = None):
+                 transform_args_file_path: Path,
+                 ):
         """
         :param data 所有数据，包括x和y，形如下面的一个pd.DataFrame
                            temperature  solar irradiation   precipitation   air density   mains_var   appliance_var
@@ -124,36 +125,13 @@ class NILMTorchDataset(TorchDataSet):
         minimum
         maximum
         :param transform_args_file_path
-        :param transformed_data_file_path 相当于一个缓存。因为有的转换特别花时间，如果先前直接全部转换好，存到硬盘中，
-        到时候直接载入就好
         """
         self.data = data  # type: pd.DataFrame
         self.sequence_length = sequence_length  # type: int
         self.over_lapping = over_lapping
         self.country = country
-        self.transform_args = self.get_transform_args(transform_args_file_path)  # type: pd.DataFrame
-        self.transformed_data_file_path = transformed_data_file_path
-
-    def __getitem__(self, index: int):
-        # 决定索引的位置
-        if self.over_lapping:
-            index_slice = slice(index, index + self.sequence_length)
-        else:
-            index_slice = slice(index * self.sequence_length, (index + 1) * self.sequence_length)
-        # 如果有完整的数据就直接载入
-        if try_to_find_file(self.transformed_data_file_path):
-            transformed_x, transformed_y = load_pkl_file(
-                self.transformed_data_file_path)  # type: pd.DataFrame, pd.DataFrame
-            transformed_x_y = (transformed_x.iloc[index_slice], transformed_y.iloc[index_slice])
-        else:
-            transformed_x_y = self.transform(index_slice)
-        data_x = torch.tensor(transformed_x_y[0].values,
-                              device='cuda:0',
-                              dtype=torch.float)  # type: torch.tensor
-        data_y = torch.tensor(transformed_x_y[-1].values,
-                              device='cuda:0',
-                              dtype=torch.float)  # type: torch.tensor
-        return data_x, data_y
+        # 最后进行transform
+        self.transformed_data = self._transform(transform_args_file_path)  # type: Tuple[torch.tensor, torch.tensor]
 
     def __len__(self):
         if self.over_lapping:
@@ -161,43 +139,40 @@ class NILMTorchDataset(TorchDataSet):
         else:
             return int(self.data.__len__() / self.sequence_length)
 
-    def transform(self, index=None,
-                  datetime_onehot_encoder_results_file_path: Path = None) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    def __getitem__(self, index: int):
         # 决定索引的位置
-        index = index or slice(self.data.shape[0])
-        # 如果有完整的time_var的数据就直接载入
-        if try_to_find_file(datetime_onehot_encoder_results_file_path):
-            time_var_transformed = load_pkl_file(datetime_onehot_encoder_results_file_path)
-            time_var_transformed = time_var_transformed[index]
+        if self.over_lapping:
+            index_slice = slice(index, index + self.sequence_length)
         else:
-            datetime_onehot_encoder = DatetimeOnehotEncoder()
-            time_var_transformed = datetime_onehot_encoder(self.data.index[index],
-                                                           country=self.country)
-        other_var_transformed = pd.DataFrame(columns=self.transform_args.columns)
-        for this_col in self.transform_args.columns:
-            other_var_transformed.loc[:, this_col] = (self.data.loc[:, this_col].iloc[index] -
-                                                      self.transform_args.loc['minimum', this_col]) / (
-                                                             self.transform_args.loc['maximum', this_col] -
-                                                             self.transform_args.loc['minimum', this_col])
+            index_slice = slice(index * self.sequence_length, (index + 1) * self.sequence_length)
+        data_x = self.transformed_data[0][index_slice]  # type: torch.tensor
+        data_y = self.transformed_data[1][index_slice]  # type: torch.tensor
+        return data_x, data_y
+
+    def _transform(self, transform_args_file_path) -> Tuple[torch.tensor, torch.tensor]:
+        # 时间变量
+        datetime_onehot_encoder = DatetimeOnehotEncoder()
+        time_var_transformed = datetime_onehot_encoder(self.data.index,
+                                                       country=self.country)
+        # 其它
+        transform_args = self._get_transform_args(transform_args_file_path)
+        other_var_transformed = pd.DataFrame(columns=transform_args.columns)
+        for this_col in transform_args.columns:
+            other_var_transformed.loc[:, this_col] = (self.data.loc[:, this_col] -
+                                                      transform_args.loc['minimum', this_col]) / (
+                                                             transform_args.loc['maximum', this_col] -
+                                                             transform_args.loc['minimum', this_col])
         transformed_x_y = pd.concat(
             (time_var_transformed, other_var_transformed.reset_index().drop('TIMESTAMP', axis=1)), axis=1)
-        return transformed_x_y.iloc[:, :-1], transformed_x_y.iloc[:, [-1]]
+        data_x = torch.tensor(transformed_x_y.iloc[:, :-1].values,
+                              device='cuda:0',
+                              dtype=torch.float)
+        data_y = torch.tensor(transformed_x_y.iloc[:, [-1]].values,
+                              device='cuda:0',
+                              dtype=torch.float)
+        return data_x, data_y
 
-    def transform_all_data_and_save(self, datetime_onehot_encoder_results_file_path: Path):
-        if not try_to_find_file(datetime_onehot_encoder_results_file_path):
-            datetime_onehot_encoder = DatetimeOnehotEncoder()
-            time_var_transformed = datetime_onehot_encoder(self.data.index,
-                                                           country=self.country)
-            save_pkl_file(datetime_onehot_encoder_results_file_path, time_var_transformed)
-
-        @load_exist_pkl_file_otherwise_run_and_save(self.transformed_data_file_path)
-        def func() -> Tuple[pd.DataFrame, pd.DataFrame]:
-            return self.transform(datetime_onehot_encoder_results_file_path=
-                                  datetime_onehot_encoder_results_file_path)
-
-        return func
-
-    def get_transform_args(self, file_path: Path) -> pd.DataFrame:
+    def _get_transform_args(self, file_path: Path) -> pd.DataFrame:
         """
         根据self.weather_var, self.main_var, self.appliance_var，载入 OR 计算并保存min-max变换需要的参数
         """
