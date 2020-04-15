@@ -182,7 +182,7 @@ class NILMTorchDataset(TorchDataSet):
         @load_exist_pkl_file_otherwise_run_and_save(file_path)
         def func() -> pd.DataFrame:
             transform_args = pd.DataFrame(index=('minimum', 'maximum'),
-                                          columns=self.data.columns.drop('time_var'))
+                                          columns=self.data.columns)
             for i in transform_args.columns:
                 transform_args[i] = (np.nanmin(self.data[i].values), np.nanmax(self.data[i].values))
             return transform_args
