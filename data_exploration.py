@@ -14,6 +14,8 @@ from project_path_Var import project_path_
 import os
 from Time_Processing.SynchronousTimeSeriesData_Class import merge_two_time_series_df
 from FFT_Class import FFTProcessor
+from scipy.io import loadmat
+from pathlib import Path
 
 
 def plot_active_power_for_meter_group(meter_group: MeterGroup, sample_period=60, **kwargs):
@@ -176,11 +178,38 @@ def energies_paper_fft_for_ampds2_dataset():
            title='Ampds2 mains FFT (zoom in)')
 
 
+def energies_paper_fft_for_scotland():
+    considered_bus = {'JOHN': loadmat(Path(project_path_) / 'Data/Raw/John_and_China/Data_load.mat')['John_load'],
+                      'DRUM': loadmat(Path(project_path_) / 'Data/Raw/Scotland selected/Drum/Data_P.mat')['P'],
+                      'MAYB': loadmat(Path(project_path_) / 'Data/Raw/Scotland selected/MAYB/Data_P.mat')['P'],
+                      'STHA': loadmat(Path(project_path_) / 'Data/Raw/Scotland selected/STHA/Data_P.mat')['P']}
+    for key, values in considered_bus.items():
+        fft_results = FFTProcessor(values.flatten(), 60 * 30)
+        fft_results.single_sided_fft_results_usable(ordered_by_magnitude=True).iloc[:1000].to_csv(
+            project_path_ + f'Report/Scotland {key} fft top 1000 descending by magnitude.csv')
+    # series(fft_results.single_sided_frequency_axis, np.log(fft_results.single_sided_amplitude_spectrum),
+    #        x_label='Frequency (Hz)', y_label='Log magnitude',
+    #        title='Ampds2 mains FFT')
+    # series(fft_results.single_sided_frequency_axis, fft_results.single_sided_angle,
+    #        x_label='Frequency (Hz)', y_label='Phase angle (rad)',
+    #        title='Ampds2 mains FFT')
+    #
+    # series(fft_results.single_sided_frequency_axis, np.log(fft_results.single_sided_amplitude_spectrum),
+    #        x_label='Frequency (Hz)', y_label='Log magnitude',
+    #        x_lim=(-0.000001, 0.00011), y_lim=(10, 22),
+    #        title='Ampds2 mains FFT (zoom in)')
+    # series(fft_results.single_sided_frequency_axis, fft_results.single_sided_angle,
+    #        x_label='Frequency (Hz)', y_label='Phase angle (rad)',
+    #        x_lim=(-0.000001, 0.00011),
+    #        title='Ampds2 mains FFT (zoom in)')
+
+
 def energies_paper():
     # energies_paper_one_day_visulisation_for_ampds2_dataset()
     # energies_paper_correlation_exploration_for_ampds2_dataset()
     # energies_paper_get_category_and_consumption_for_ampds2_dataset()
-    energies_paper_fft_for_ampds2_dataset()
+    # energies_paper_fft_for_ampds2_dataset()
+    energies_paper_fft_for_scotland()
 
 
 if __name__ == '__main__':
