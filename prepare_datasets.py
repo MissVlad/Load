@@ -19,6 +19,10 @@ from torch.utils.data import Dataset as TorchDataSet, DataLoader as TorchDataLoa
 import torch
 from pathlib import Path
 from Time_Processing.datetime_utils import DatetimeOnehotEncoder
+from project_path_Var import project_path_
+from scipy.io import loadmat
+import datetime
+from abc import ABCMeta, abstractmethod
 
 DATASET_ROOT_DIRECTORY = r'E:\OneDrive_Extra\Database\Load_Disaggregation'
 
@@ -82,7 +86,7 @@ def load_datasets():
     return _ampds2_dataset, _refit_dataset, _uk_dale_dataset
 
 
-def get_training_set_test_set_for_ampds2_dataset() -> Tuple[MeterGroup, MeterGroup]:
+def get_training_set_and_test_set_for_ampds2_dataset() -> Tuple[MeterGroup, MeterGroup]:
     """
     从ampds2_dataset中分离出training set和test set，
     只考虑building 1
@@ -151,7 +155,11 @@ class NILMTorchDataset(TorchDataSet):
 
     def _transform(self, transform_args_file_path) -> Tuple[torch.tensor, torch.tensor]:
         # 时间变量
-        datetime_onehot_encoder = DatetimeOnehotEncoder()
+        datetime_onehot_encoder = DatetimeOnehotEncoder(to_encoding_args=('month',
+                                                                          'weekday',
+                                                                          'holiday',
+                                                                          'hour',
+                                                                          'minute'))
         time_var_transformed = datetime_onehot_encoder(self.data.index,
                                                        country=self.country)
         # 其它
@@ -190,5 +198,124 @@ class NILMTorchDataset(TorchDataSet):
         return func
 
 
+class ScotlandDataset(metaclass=ABCMeta):
+    data_path_root = Path(project_path_) / r'Data\Raw\Scotland selected'
+    __slots__ = ('name', 'matlab_mat_file_folder', 'dataset')
+
+    def __init__(self, name: str):
+        """
+        name可选: ['Drum', 'John', 'MAYB', 'STHA']
+        """
+        if name not in ['Drum', 'John', 'MAYB', 'STHA']:
+            raise Exception('Unknown bus')
+        self.name = name
+        self.matlab_mat_file_folder = self.data_path_root / self.name
+        self.dataset = self.load_raw_data()  # type: pd.DataFrame
+
+    def __str__(self):
+        return f'Scotland dataset: {self.name}, from {self.dataset.index[0]} to {self.dataset.index[-1]}'
+
+    def load_raw_data(self) -> pd.DataFrame:
+        """
+        重复利用以前的结果。载入matlab那些原始数据
+        """
+        time_index = self._get_time_index()
+        holiday_ndarray = self._get_holiday_ndarray()
+        raw_data = pd.DataFrame(data={'holiday': holiday_ndarray,
+                                      'active power': self.load_active_power_mat()},
+                                index=time_index)
+        return raw_data
+
+    def set_weekends_and_holiday_to_zeros(self, inplace=False) -> Tuple[pd.DataFrame, ndarray]:
+        """
+        把节假日或者周末的数据置为0
+        :return 置0后的pd.DataFrame和对应的mask
+        """
+        mask = np.any((self.dataset.index.weekday == 5,  # 周六，因为Monday=0, Sunday=6.
+                       self.dataset.index.weekday == 6,  # 周天，因为Monday=0, Sunday=6.
+                       self.dataset['holiday'] == 1), axis=0)
+        if inplace:
+            self.dataset.loc[mask, 'active power'] = 0
+            return self.dataset, mask
+        else:
+            dataset_copy = copy.deepcopy(self.dataset)
+            dataset_copy.loc[mask, 'active power'] = 0
+            return dataset_copy, mask
+
+    def _get_time_index(self) -> pd.DatetimeIndex:
+        """
+        基于matlab那些原始数据得到python的pd.DatetimeIndex
+        """
+        ts_matrix = self.load_ts_mat()
+        datetime_tuple = [datetime.datetime(year=int(x[0]),
+                                            month=int(x[1]),
+                                            day=int(x[2]),
+                                            hour=int(x[3]),
+                                            minute=int(60 * (x[3] - int(x[3])))) for x in ts_matrix]
+        time_index = pd.DatetimeIndex(datetime_tuple)
+        return time_index
+
+    def _get_holiday_ndarray(self) -> ndarray:
+        """
+        基于matlab那些原始数据，提取节假日标志量：1代表是holiday，0代表不是
+        """
+        ts_matrix = self.load_ts_mat()
+        return ts_matrix[:, -1].astype(int)
+
+    @abstractmethod
+    def load_active_power_mat(self) -> ndarray:
+        """
+        载入Data_P_modified.mat或者Data_P.mat
+        """
+        pass
+
+    @abstractmethod
+    def load_ts_mat(self) -> ndarray:
+        """
+        载入Data_ts_modified.mat或者Data_ts.mat
+        """
+        pass
+
+
+class ScotlandLongerDataset(ScotlandDataset):
+    """
+    指那些有四五年记录的bus，比如'Drum'和'John'
+    """
+
+    def __init__(self, name: str):
+        """
+        需要注意的是闰年2月29号没有记录，active power全部用0去填充的
+        """
+        if name not in ('Drum', 'John'):
+            raise Exception('Wrong name')
+        super().__init__(name)
+
+    def load_active_power_mat(self) -> ndarray:
+        return loadmat(self.matlab_mat_file_folder / 'Data_P_modified.mat')['P'].flatten()
+
+    def load_ts_mat(self) -> ndarray:
+        return loadmat(self.matlab_mat_file_folder / 'Data_ts_modified.mat')['ts']
+
+
+class ScotlandShorterDataset(ScotlandDataset):
+    """
+    指那些只有一年记录的bus，比如'MAYB'和'STHA'
+    """
+
+    def __init__(self, name: str):
+        if name not in ('MAYB', 'STHA'):
+            raise Exception('Wrong name')
+        super().__init__(name)
+
+    def load_active_power_mat(self) -> ndarray:
+        return loadmat(self.matlab_mat_file_folder / 'Data_P.mat')['P'].flatten()
+
+    def load_ts_mat(self) -> ndarray:
+        return loadmat(self.matlab_mat_file_folder / 'Data_ts.mat')['ts']
+
+
 if __name__ == '__main__':
     ampds2_dataset, refit_dataset, uk_dale_dataset = load_datasets()
+    get_training_set_and_test_set_for_ampds2_dataset()
+    # John_data = ScotlandLongerDataset('John')
+    # John_data.set_weekends_and_holiday_to_zeros()

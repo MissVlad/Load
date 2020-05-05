@@ -1,17 +1,15 @@
-from Regression_Analysis.DeepLearning_Class import SimpleLSTM, BayesCOVN1DLSTM
+from Regression_Analysis.DeepLearning_Class import StackedBiLSTM
 import pandas as pd
 from pandas import DataFrame
 from Ploting.fast_plot_Func import *
 from project_path_Var import project_path_
-from prepare_datasets import get_training_set_test_set_for_ampds2_dataset, NILMTorchDataset, \
+from prepare_datasets import get_training_set_and_test_set_for_ampds2_dataset, NILMTorchDataset, \
     load_ampds2_weather
 from nilmtk.legacy.disaggregate import CombinatorialOptimisation, FHMM
-import time
 from pathlib import Path
 from File_Management.path_and_file_management_Func import try_to_find_file
-from File_Management.load_save_Func import load_exist_pkl_file_otherwise_run_and_save, load_pkl_file, save_pkl_file
-from nilmtk import MeterGroup
-from Time_Processing.SynchronousTimeSeriesData_Class import merge_two_time_series_df
+from File_Management.load_save_Func import load_pkl_file, save_pkl_file
+from TimeSeries_Class import merge_two_time_series_df
 from torch.utils.data import DataLoader
 import torch
 from torch.nn.functional import mse_loss
@@ -20,24 +18,51 @@ import time
 import re
 
 
-def energies_paper_prepare_dataset_for_torch_model_for_ampds2_dataset(appliance_original_name: str):
+def energies_paper_prepare_dataset_for_torch_model_for_ampds2_dataset(*, appliance_original_name: str = None,
+                                                                      appliance_type_name: str = None,
+                                                                      sample_period: int):
     """
     返回专门针对pytorch的nn模型的dataset
     :param appliance_original_name: 可选['HPE', 'FRE', 'CDE']
+    :param appliance_type_name: 可选['Lighting', 'Heating']:
+                          'Lighting'是'B1E', 'B2E', 'OFE'的aggregate;
+                          'Heating'只包含'HPE'
+    :param sample_period: 必选。重采样。单位是秒
     """
-    training_set, test_set = get_training_set_test_set_for_ampds2_dataset()
+    if ((appliance_original_name or appliance_type_name) is None) or (
+            (appliance_original_name is not None) and (appliance_type_name is not None)):
+        raise Exception('Ambiguous args')
+    training_set, test_set = get_training_set_and_test_set_for_ampds2_dataset()
     torch_sets = []
-    _path = Path(project_path_) / 'Data/Results/Energies_paper/Ampds2/'
-    transform_args_file_path = _path / 'transform_args_{}.pkl'.format(appliance_original_name)  # 只与用电器有关
+    _path = Path(project_path_) / f'Data/Results/Energies_paper/Ampds2/lstm/' \
+                                  f'{appliance_original_name or appliance_type_name}/'
+    _path.mkdir(parents=True, exist_ok=True)
+    transform_args_file_path = _path / f'transform_args_{appliance_original_name or appliance_type_name}_' \
+                                       f'{sample_period}.pkl'
     # 生成training set和test set对应的TorchDataset对象
     for i, this_set in enumerate((training_set, test_set)):
         # appliance_var
-        appliance_df = next(this_set.select_using_appliances(original_name=[appliance_original_name]).meters[0].load(
-            ac_type='active', sample_period=60)).droplevel('physical_quantity', axis=1)  # type: DataFrame
+        if appliance_original_name is not None:
+            appliance_df = next(this_set.select_using_appliances(
+                original_name=[appliance_original_name]).meters[0].load(ac_type='active', sample_period=sample_period))
+            appliance_df = appliance_df.droplevel('physical_quantity', axis=1)  # type: DataFrame
+        else:
+            if appliance_type_name == 'Lighting':
+                appliance_df = this_set.select_using_appliances(
+                    original_name=['B1E', 'B2E', 'OFE']).dataframe_of_meters(
+                    ac_type='active', sample_period=sample_period)
+                appliance_df['Lighting'] = appliance_df.sum(axis=1)
+                appliance_df.drop(columns=appliance_df.columns[:-1], inplace=True)
+            elif appliance_type_name == 'Heating':
+                appliance_df = next(this_set.select_using_appliances(
+                    original_name=['HPE']).meters[0].load(ac_type='active', sample_period=sample_period))
+                appliance_df = appliance_df.droplevel('physical_quantity', axis=1)  # type: DataFrame
+            else:
+                raise Exception("Unsupported type. Only support 'Lighting' or 'Heating'")
         appliance_df.rename(columns={appliance_df.columns[0]: 'appliance_var'}, inplace=True)
         # mains_var
         mains_df = next(this_set.mains().load(
-            ac_type='active', sample_period=60)).droplevel('physical_quantity', axis=1)  # type: DataFrame
+            ac_type='active', sample_period=sample_period)).droplevel('physical_quantity', axis=1)  # type: DataFrame
         mains_df.rename(columns={mains_df.columns[0]: 'mains_var'}, inplace=True)
         # weather_var
         ampds2_weather_df = load_ampds2_weather()
@@ -50,34 +75,43 @@ def energies_paper_prepare_dataset_for_torch_model_for_ampds2_dataset(appliance_
         # 注意transform_args.pkl的命名方式，这样让training set和test set共用一组参数，只与用电器有关,
         # 由training set决定，因为loop中它在先
         torch_sets.append(NILMTorchDataset(data,
-                                           sequence_length=60 * 24,
+                                           sequence_length=int((3600 * 24) / sample_period),  # 即：一天中的样本个数
                                            transform_args_file_path=transform_args_file_path,
                                            country=Canada()))
     return tuple(torch_sets)
 
 
-def energies_paper_train_torch_model_for_ampds2_dataset(appliance_original_name: str,
+def energies_paper_train_torch_model_for_ampds2_dataset(*, appliance_original_name: str = None,
+                                                        appliance_type_name: str = None,
+                                                        sample_period: int,
                                                         model_save_path: Path) -> dict:
     training_time_path = model_save_path.parent / re.sub(r'_model', '_training_and_loss.pkl', model_save_path.stem)
     if not try_to_find_file(model_save_path):
         ############################################################
-        epoch_num = 200
-        training_torch_set_dl_bs = 32
-        hidden_size = 1024 * 4
+        epoch_num = 2700
+        training_torch_set_dl_bs = 100
+        hidden_size = 1024 * 2
         learning_rate = 1e-4
+        weight_decay = 0.00001
+        dropout = 0.1
         #############################################################
         training_torch_set = energies_paper_prepare_dataset_for_torch_model_for_ampds2_dataset(
-            appliance_original_name)[0]
+            appliance_original_name=appliance_original_name,
+            appliance_type_name=appliance_type_name,
+            sample_period=sample_period)[0]
         training_torch_set_dl = DataLoader(training_torch_set,
                                            batch_size=training_torch_set_dl_bs,
                                            shuffle=False)
         # %% 定义模型
-        simple_lstm_model = SimpleLSTM(input_size=training_torch_set[0][0].size()[-1],
-                                       hidden_size=hidden_size,
-                                       output_size=training_torch_set[0][1].size()[-1])
+        simple_lstm_model = StackedBiLSTM(input_size=training_torch_set[0][0].size()[-1],
+                                          hidden_size=hidden_size,
+                                          output_size=training_torch_set[0][1].size()[-1],
+                                          dropout=dropout)
         # simple_lstm_model = torch.nn.DataParallel(simple_lstm_model, device_ids=[0]).cuda()  # 将模型转为cuda类型
         # %% 定义优化器
-        opt = torch.optim.Adam(simple_lstm_model.parameters(), lr=learning_rate)
+        opt = torch.optim.Adam(simple_lstm_model.parameters(),
+                               lr=learning_rate,
+                               weight_decay=weight_decay)  # weight_decay代表L2正则化
         # %% 定义loss函数
         loss_func = mse_loss
         # %% 开始train
@@ -105,25 +139,40 @@ def energies_paper_train_torch_model_for_ampds2_dataset(appliance_original_name:
             'training_time_and_loss': load_pkl_file(training_time_path)}
 
 
-def energies_paper_test_torch_model_for_ampds2_dataset(appliance_original_name: str,
+def energies_paper_test_torch_model_for_ampds2_dataset(*, appliance_original_name: str = None,
+                                                       appliance_type_name: str = None,
+                                                       sample_period: int,
                                                        model_save_path: Path):
     model = torch.load(model_save_path)
     # 载入测试集
     test_torch_set = energies_paper_prepare_dataset_for_torch_model_for_ampds2_dataset(
-        appliance_original_name)[1]
+        appliance_original_name=appliance_original_name,
+        appliance_type_name=appliance_type_name,
+        sample_period=sample_period)[0]
     test_torch_set_dl = DataLoader(test_torch_set,
                                    batch_size=1,
                                    shuffle=False)
     for index, (xb, yb) in enumerate(test_torch_set_dl):
-        if index > 2:
-            break
+        if (index != 0) and (index != int(365 / 4)) and (index != int(365 / 4 * 2)) and (index != int(365 / 4 * 3)):
+            # if not ((index >= 0) and (index <= int(10))):
+            continue
         pred = model(xb)
-        ax = series(test_torch_set.data.index[index:index + test_torch_set.sequence_length].to_pydatetime(),
-                    pred.detach().cpu().numpy().flatten(), label='LSTM')
-        series(test_torch_set.data.index[index:index + test_torch_set.sequence_length].to_pydatetime(),
-               yb.cpu().numpy().flatten(), ax=ax, label='Truth',
-               x_label='Hour',
-               y_label='Normlised active power (p.u.)')
+        ax = series(test_torch_set.data.index[
+                    index * test_torch_set.sequence_length:(index + 1) * test_torch_set.sequence_length
+                    ].to_pydatetime(),
+                    pred.detach().cpu().numpy().flatten(), label='LSTM', figure_size=(10, 2.4))
+        series(test_torch_set.data.index[
+               index * test_torch_set.sequence_length:(index + 1) * test_torch_set.sequence_length].to_pydatetime(),
+               yb.cpu().numpy().flatten(),
+               ax=ax,
+               label='Truth',
+               x_label='Time',
+               y_label='Normlised active power (p.u.)',
+               # y_lim=(-0.01, 1.01),
+               figure_size=(10, 2.4),
+               title=appliance_original_name or appliance_type_name,
+               save_file_=(appliance_original_name or appliance_type_name) + f'_{index}',
+               save_format='png')
     # 画loss
     # _loss = tt['training_time_and_loss']['loss']
     # _loss = np.array(list(map(lambda x: np.array(x, dtype=float), _loss)))
@@ -139,7 +188,7 @@ def energies_paper_train_nilm_models_for_ampds2_dataset(top_n: int = 3):
     :return:
     """
     # 准备训练数据
-    training_set, test_set = get_training_set_test_set_for_ampds2_dataset()
+    training_set, test_set = get_training_set_and_test_set_for_ampds2_dataset()
     top_n_train_elec = training_set.select_using_appliances(original_name=['HPE', 'FRE', 'CDE'])
     # 模型save的路径
     models_path = Path('../Data/Results/Energies_paper/Ampds2')
@@ -163,13 +212,27 @@ def energies_paper_train_nilm_models_for_ampds2_dataset(top_n: int = 3):
 
 
 if __name__ == '__main__':
-    # energies_paper_train_nilm_models_for_ampds2_dataset()
-    appliance_name = ('HPE', 'FRE', 'CDE')
-    for this_appliance_name in appliance_name:
-        if this_appliance_name != 'HPE':
-            continue
-        energies_paper_test_torch_model_for_ampds2_dataset(
-            this_appliance_name,
-            Path(project_path_) / f'Data/Results/Energies_paper/Ampds2/lstm/{this_appliance_name}_lstm_model.pkl'
-        )
+    _sample_period = 60 * 30
+    for this_type in ('Lighting',):
+        energies_paper_train_torch_model_for_ampds2_dataset(
+            appliance_type_name=this_type,
+            model_save_path=Path(project_path_) / f'Data/Results/Energies_paper/Ampds2/lstm/{this_type}/'
+                                                  f'{this_type}_{_sample_period}_lstm_model.pkl',
+            sample_period=_sample_period)
+        # energies_paper_test_torch_model_for_ampds2_dataset(
+        #     appliance_type_name=this_type,
+        #     model_save_path=Path(project_path_) / f'Data/Results/Energies_paper/Ampds2/lstm/{this_type}/'
+        #                                           f'{this_type}_{_sample_period}_lstm_model.pkl',
+        #     sample_period=_sample_period)
 
+    for this_appliance in ('B1E', 'OFE', 'B2E', 'HPE'):
+        energies_paper_train_torch_model_for_ampds2_dataset(
+            appliance_original_name=this_appliance,
+            model_save_path=Path(project_path_) / f'Data/Results/Energies_paper/Ampds2/lstm/{this_appliance}/'
+                                                  f'{this_appliance}_{_sample_period}_lstm_model.pkl',
+            sample_period=_sample_period)
+        # energies_paper_test_torch_model_for_ampds2_dataset(
+        #     appliance_original_name=this_appliance,
+        #     model_save_path=Path(project_path_) / f'Data/Results/Energies_paper/Ampds2/lstm/{this_appliance}/'
+        #                                           f'{this_appliance}_{_sample_period}_lstm_model.pkl',
+        #     sample_period=_sample_period)
