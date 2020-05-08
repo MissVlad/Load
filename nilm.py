@@ -14,8 +14,10 @@ from torch.utils.data import DataLoader
 import torch
 from torch.nn.functional import mse_loss
 from workalendar.america import Canada
+import datetime
 import time
 import re
+from Writting.utils import put_cached_png_into_a_docx
 
 
 def energies_paper_prepare_dataset_for_torch_model_for_ampds2_dataset(*, appliance_original_name: str = None,
@@ -148,31 +150,36 @@ def energies_paper_test_torch_model_for_ampds2_dataset(*, appliance_original_nam
     test_torch_set = energies_paper_prepare_dataset_for_torch_model_for_ampds2_dataset(
         appliance_original_name=appliance_original_name,
         appliance_type_name=appliance_type_name,
-        sample_period=sample_period)[0]
+        sample_period=sample_period)[1]
     test_torch_set_dl = DataLoader(test_torch_set,
                                    batch_size=1,
                                    shuffle=False)
+    save_as_docx_buff = {(test_torch_set.data.index[0] + datetime.timedelta(days=i)).strftime("%Y_%m_%d"): [None, None]
+                         for i in range(test_torch_set.__len__())}
+
     for index, (xb, yb) in enumerate(test_torch_set_dl):
-        if (index != 0) and (index != int(365 / 4)) and (index != int(365 / 4 * 2)) and (index != int(365 / 4 * 3)):
-            # if not ((index >= 0) and (index <= int(10))):
-            continue
         pred = model(xb)
         ax = series(test_torch_set.data.index[
                     index * test_torch_set.sequence_length:(index + 1) * test_torch_set.sequence_length
                     ].to_pydatetime(),
                     pred.detach().cpu().numpy().flatten(), label='LSTM', figure_size=(10, 2.4))
-        series(test_torch_set.data.index[
-               index * test_torch_set.sequence_length:(index + 1) * test_torch_set.sequence_length].to_pydatetime(),
-               yb.cpu().numpy().flatten(),
-               ax=ax,
-               label='Truth',
-               x_label='Time',
-               y_label='Normlised active power (p.u.)',
-               # y_lim=(-0.01, 1.01),
-               figure_size=(10, 2.4),
-               title=appliance_original_name or appliance_type_name,
-               save_file_=(appliance_original_name or appliance_type_name) + f'_{index}',
-               save_format='png')
+        x_plot = test_torch_set.data.index[
+                 index * test_torch_set.sequence_length:(index + 1) * test_torch_set.sequence_length].to_pydatetime()
+        buf = series(
+            x_plot,
+            yb.cpu().numpy().flatten(),
+            ax=ax,
+            label='Truth',
+            x_label='Time',
+            y_label='Normlised active power (p.u.)',
+            figure_size=(10, 2.4),
+            title=appliance_original_name or appliance_type_name,
+            save_to_buffer=True)
+        save_as_docx_buff[(test_torch_set.data.index[0] + datetime.timedelta(days=index)).strftime("%Y_%m_%d")][0] = buf
+    put_cached_png_into_a_docx(save_as_docx_buff,
+                               model_save_path.parent / f'{appliance_original_name or appliance_type_name}_'
+                                                        f'{sample_period}.docx',
+                               1)
     # 画loss
     # _loss = tt['training_time_and_loss']['loss']
     # _loss = np.array(list(map(lambda x: np.array(x, dtype=float), _loss)))
@@ -212,27 +219,27 @@ def energies_paper_train_nilm_models_for_ampds2_dataset(top_n: int = 3):
 
 
 if __name__ == '__main__':
-    _sample_period = 60 * 30
-    for this_type in ('Lighting',):
-        energies_paper_train_torch_model_for_ampds2_dataset(
-            appliance_type_name=this_type,
-            model_save_path=Path(project_path_) / f'Data/Results/Energies_paper/Ampds2/lstm/{this_type}/'
-                                                  f'{this_type}_{_sample_period}_lstm_model.pkl',
-            sample_period=_sample_period)
-        # energies_paper_test_torch_model_for_ampds2_dataset(
-        #     appliance_type_name=this_type,
-        #     model_save_path=Path(project_path_) / f'Data/Results/Energies_paper/Ampds2/lstm/{this_type}/'
-        #                                           f'{this_type}_{_sample_period}_lstm_model.pkl',
-        #     sample_period=_sample_period)
+    for _sample_period in (60, 60 * 30):
+        for this_type in ('Lighting',):
+            # energies_paper_train_torch_model_for_ampds2_dataset(
+            #     appliance_type_name=this_type,
+            #     model_save_path=Path(project_path_) / f'Data/Results/Energies_paper/Ampds2/lstm/{this_type}/'
+            #                                           f'{this_type}_{_sample_period}_lstm_model.pkl',
+            #     sample_period=_sample_period)
+            energies_paper_test_torch_model_for_ampds2_dataset(
+                appliance_type_name=this_type,
+                model_save_path=Path(project_path_) / f'Data/Results/Energies_paper/Ampds2/lstm/{this_type}/'
+                                                      f'{this_type}_{_sample_period}_lstm_model.pkl',
+                sample_period=_sample_period)
 
-    for this_appliance in ('B1E', 'OFE', 'B2E', 'HPE'):
-        energies_paper_train_torch_model_for_ampds2_dataset(
-            appliance_original_name=this_appliance,
-            model_save_path=Path(project_path_) / f'Data/Results/Energies_paper/Ampds2/lstm/{this_appliance}/'
-                                                  f'{this_appliance}_{_sample_period}_lstm_model.pkl',
-            sample_period=_sample_period)
-        # energies_paper_test_torch_model_for_ampds2_dataset(
-        #     appliance_original_name=this_appliance,
-        #     model_save_path=Path(project_path_) / f'Data/Results/Energies_paper/Ampds2/lstm/{this_appliance}/'
-        #                                           f'{this_appliance}_{_sample_period}_lstm_model.pkl',
-        #     sample_period=_sample_period)
+        for this_appliance in ('B1E', 'OFE', 'B2E', 'HPE'):
+            # energies_paper_train_torch_model_for_ampds2_dataset(
+            #     appliance_original_name=this_appliance,
+            #     model_save_path=Path(project_path_) / f'Data/Results/Energies_paper/Ampds2/lstm/{this_appliance}/'
+            #                                           f'{this_appliance}_{_sample_period}_lstm_model.pkl',
+            #     sample_period=_sample_period)
+            energies_paper_test_torch_model_for_ampds2_dataset(
+                appliance_original_name=this_appliance,
+                model_save_path=Path(project_path_) / f'Data/Results/Energies_paper/Ampds2/lstm/{this_appliance}/'
+                                                      f'{this_appliance}_{_sample_period}_lstm_model.pkl',
+                sample_period=_sample_period)

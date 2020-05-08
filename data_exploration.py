@@ -164,47 +164,49 @@ def energies_paper_fft_for_ampds2_dataset(sample_period):
     mains = next(ampds2_dataset.buildings[1].elec.mains().load(physical_quantity='power',
                                                                ac_type='active',
                                                                sample_period=sample_period))
+    hpe = next(ampds2_dataset.buildings[1].elec.select_using_appliances(
+        original_name=['HPE']).meters[0].load(ac_type='active', sample_period=sample_period))
+    hpe = hpe.droplevel('physical_quantity', axis=1)  # type: DataFrame
     # np.log
     mains = mains.apply(np.log)
+    hpe = hpe.apply(np.log)  # type: pd.DataFrame
     # detrend
     mains = UnivariateTimeSeries(mains)
     mains.detrend(resample_args_dict={'rule': '168H'},
                   inplace=True)  # type: pd.DataFrame
+
+    hpe = UnivariateTimeSeries(hpe)
+    hpe.detrend(resample_args_dict={'rule': '168H'},
+                inplace=True)  # type: pd.DataFrame
     # 画图，一周周的叠加
     save_figure_path = Path(project_path_) / 'Data/Results/Energies_paper/fft/ampds2'
     save_figure_path.mkdir(parents=True, exist_ok=True)
-    mains.plot_group_by_week(
-        save_file_=str(save_figure_path / 'detrend_log'),
-        save_format='png')
+    # mains.plot_group_by_week(
+    #     x_label='Day of week',
+    #     y_label='Detrended log-load',
+    #     save_file_=str(save_figure_path / 'detrend_log'),
+    #     save_format='png')
+    # hpe.plot_group_by_week(
+    #     x_label='Day of week',
+    #     y_label='Detrended log-load',
+    #     save_file_=str(save_figure_path / 'detrend_log_hpe'),
+    #     save_format='png')
 
     # 将holiday和weekends置为zeros
     datetime_onehot_encoder = DatetimeOnehotEncoder(to_encoding_args=('holiday', 'weekday'))
-    time_var_transformed = datetime_onehot_encoder(log_detrended_mains.index,
+    time_var_transformed = datetime_onehot_encoder(mains.data.index,
                                                    country=Canada())
     mask = np.any((time_var_transformed[('holiday', 1)] == 1,
                    time_var_transformed[('weekday', 6)] == 1,
                    time_var_transformed[('weekday', 7)] == 1), axis=0)
-    log_detrended_mains[mask] = 0  # type:pd.DataFrame
+    mains.data[mask] = 0  # type:pd.DataFrame
+    hpe.data[mask] = 0  # type:pd.DataFrame
 
     # 将处理好（p.log，detrend, 部分被置零）的数据进行FFT
-    fft_results = FFTProcessor(mains, sampling_period=sample_period)
-    fft_results.single_sided_period_axis_all_supported(ordered_by_magnitude=True).iloc[:1000].to_csv(
-        project_path_ + 'Report/Ampds2 mains fft top 1000 descending by magnitude.csv')
-    series(fft_results.single_sided_frequency, np.log(fft_results.single_sided_amplitude),
-           x_label='Frequency (Hz)', y_label='Log magnitude',
-           title='Ampds2 mains FFT')
-    series(fft_results.single_sided_frequency, fft_results.single_sided_angle,
-           x_label='Frequency (Hz)', y_label='Phase angle (rad)',
-           title='Ampds2 mains FFT')
-
-    series(fft_results.single_sided_frequency, np.log(fft_results.single_sided_amplitude),
-           x_label='Frequency (Hz)', y_label='Log magnitude',
-           x_lim=(-0.000001, 0.00011), y_lim=(10, 22),
-           title='Ampds2 mains FFT (zoom in)')
-    series(fft_results.single_sided_frequency, fft_results.single_sided_angle,
-           x_label='Frequency (Hz)', y_label='Phase angle (rad)',
-           x_lim=(-0.000001, 0.00011),
-           title='Ampds2 mains FFT (zoom in)')
+    fft_results = FFTProcessor(mains.data.values.flatten(), sampling_period=sample_period, name='mains')
+    fft_results.plot(save_as_docx_path=save_figure_path / 'mains.docx')
+    fft_results = FFTProcessor(hpe.data.values.flatten(), sampling_period=sample_period, name='hpe')
+    fft_results.plot(save_as_docx_path=save_figure_path / 'hpe.docx')
 
 
 def energies_paper_fft_for_scotland():
@@ -213,6 +215,8 @@ def energies_paper_fft_for_scotland():
                       'MAYB': ScotlandShorterDataset('MAYB'),
                       'STHA': ScotlandShorterDataset('STHA')}
     for key, this_bus in considered_bus.items():
+        save_figure_folder_path = Path(project_path_) / f'Data/Results/Energies_paper/fft/{key}'
+        save_figure_folder_path.mkdir(parents=True, exist_ok=True)
         # np.log, detrend
         this_bus_active_power = UnivariateTimeSeries(
             this_bus.dataset[['active power']].apply(np.log)
@@ -220,9 +224,9 @@ def energies_paper_fft_for_scotland():
         this_bus_active_power.detrend({'rule': '168H'},  # 以周为单位detrend
                                       inplace=True)
         # 画图，一周周的叠加
-        save_figure_path = Path(project_path_) / f'Data/Results/Energies_paper/fft/{key}'
-        save_figure_path.mkdir(parents=True, exist_ok=True)
-        # this_bus_active_power.plot_group_by_week(save_file_=str(save_figure_path / 'detrend_log'),
+        # this_bus_active_power.plot_group_by_week(x_label='Day of week',
+        #                                          y_label='Detrended log-load',
+        #                                          save_file_=str(save_figure_folder_path / 'detrend_log'),
         #                                          save_format='png')
         # 置零
         this_bus_active_power = this_bus_active_power.data  # type:pd.DataFrame
@@ -232,33 +236,17 @@ def energies_paper_fft_for_scotland():
         this_bus_active_power[np.isinf(this_bus_active_power)] = np.nan
         this_bus_active_power = this_bus_active_power.fillna(0)  # type: pd.DataFrame
         # 开始FFT
-        fft_results = FFTProcessor(this_bus_active_power.values.flatten(), sampling_period=60 * 30)
-        fft_results.plot()
-        # fft_results.single_sided_fft_results_usable(ordered_by_magnitude=True).iloc[:1000].to_csv(
-        #     project_path_ + f'Report/Scotland {key} fft top 1000 descending by magnitude.csv')
-
-    # series(fft_results.single_sided_frequency_axis, np.log(fft_results.single_sided_amplitude_spectrum),
-    #        x_label='Frequency (Hz)', y_label='Log magnitude',
-    #        title='Ampds2 mains FFT')
-    # series(fft_results.single_sided_frequency_axis, fft_results.single_sided_angle,
-    #        x_label='Frequency (Hz)', y_label='Phase angle (rad)',
-    #        title='Ampds2 mains FFT')
-    #
-    # series(fft_results.single_sided_frequency_axis, np.log(fft_results.single_sided_amplitude_spectrum),
-    #        x_label='Frequency (Hz)', y_label='Log magnitude',
-    #        x_lim=(-0.000001, 0.00011), y_lim=(10, 22),
-    #        title='Ampds2 mains FFT (zoom in)')
-    # series(fft_results.single_sided_frequency_axis, fft_results.single_sided_angle,
-    #        x_label='Frequency (Hz)', y_label='Phase angle (rad)',
-    #        x_lim=(-0.000001, 0.00011),
-    #        title='Ampds2 mains FFT (zoom in)')
+        fft_results = FFTProcessor(this_bus_active_power.values.flatten(),
+                                   sampling_period=60 * 30,
+                                   name=key)
+        fft_results.plot(save_as_docx_path=save_figure_folder_path / f'{key}.docx')
 
 
 def energies_paper():
     # energies_paper_one_day_visulisation_for_ampds2_dataset()
     # energies_paper_correlation_exploration_for_ampds2_dataset()
     # energies_paper_get_category_and_consumption_for_ampds2_dataset()
-    # energies_paper_fft_for_ampds2_dataset(60 * 30)
+    energies_paper_fft_for_ampds2_dataset(60 * 30)
     energies_paper_fft_for_scotland()
 
 
