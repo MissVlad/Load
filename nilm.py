@@ -150,7 +150,7 @@ def energies_paper_test_torch_model_for_ampds2_dataset(*, appliance_original_nam
     test_torch_set = energies_paper_prepare_dataset_for_torch_model_for_ampds2_dataset(
         appliance_original_name=appliance_original_name,
         appliance_type_name=appliance_type_name,
-        sample_period=sample_period)[1]
+        sample_period=sample_period)[0]
     test_torch_set_dl = DataLoader(test_torch_set,
                                    batch_size=1,
                                    shuffle=False)
@@ -220,19 +220,21 @@ def energies_paper_train_nilm_models_for_ampds2_dataset(top_n: int = 3):
 
 if __name__ == '__main__':
     for _sample_period in (60, 60 * 30):
-        for this_type in ('Lighting',):
-            # energies_paper_train_torch_model_for_ampds2_dataset(
-            #     appliance_type_name=this_type,
-            #     model_save_path=Path(project_path_) / f'Data/Results/Energies_paper/Ampds2/lstm/{this_type}/'
-            #                                           f'{this_type}_{_sample_period}_lstm_model.pkl',
-            #     sample_period=_sample_period)
-            energies_paper_test_torch_model_for_ampds2_dataset(
-                appliance_type_name=this_type,
-                model_save_path=Path(project_path_) / f'Data/Results/Energies_paper/Ampds2/lstm/{this_type}/'
-                                                      f'{this_type}_{_sample_period}_lstm_model.pkl',
-                sample_period=_sample_period)
+        # for this_type in ('Lighting',):
+        #     # energies_paper_train_torch_model_for_ampds2_dataset(
+        #     #     appliance_type_name=this_type,
+        #     #     model_save_path=Path(project_path_) / f'Data/Results/Energies_paper/Ampds2/lstm/{this_type}/'
+        #     #                                           f'{this_type}_{_sample_period}_lstm_model.pkl',
+        #     #     sample_period=_sample_period)
+        #     energies_paper_test_torch_model_for_ampds2_dataset(
+        #         appliance_type_name=this_type,
+        #         model_save_path=Path(project_path_) / f'Data/Results/Energies_paper/Ampds2/lstm/{this_type}/'
+        #                                               f'{this_type}_{_sample_period}_lstm_model.pkl',
+        #         sample_period=_sample_period)
 
         for this_appliance in ('B1E', 'OFE', 'B2E', 'HPE'):
+            if not((_sample_period == 60) and (this_appliance=='HPE')):
+                continue
             # energies_paper_train_torch_model_for_ampds2_dataset(
             #     appliance_original_name=this_appliance,
             #     model_save_path=Path(project_path_) / f'Data/Results/Energies_paper/Ampds2/lstm/{this_appliance}/'

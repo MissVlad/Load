@@ -13,9 +13,11 @@
       <w>dtype</w>
       <w>elec</w>
       <w>fhmm</w>
+      <w>hlines</w>
       <w>iloc</w>
       <w>isoweekday</w>
       <w>lassofft</w>
+      <w>linestyles</w>
       <w>lstm</w>
       <w>markerfmt</w>
       <w>mathregular</w>
@@ -23,6 +25,7 @@
       <w>matplotlib</w>
       <w>mayb</w>
       <w>mdates</w>
+      <w>nbins</w>
       <w>ncol</w>
       <w>ndarray</w>
       <w>nilm</w>
@@ -35,10 +38,16 @@
       <w>resampled</w>
       <w>stft</w>
       <w>stha</w>
+      <w>touchtone</w>
       <w>ukdale</w>
       <w>univariate</w>
       <w>upsampled</w>
       <w>visulisation</w>
+      <w>vlines</w>
+      <w>xmax</w>
+      <w>xmin</w>
+      <w>ymax</w>
+      <w>ymin</w>
     </words>
   </dictionary>
 </component>

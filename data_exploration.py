@@ -10,7 +10,7 @@ from dateutil import tz
 from project_path_Var import project_path_
 import os
 from TimeSeries_Class import merge_two_time_series_df
-from FFT_Class import FFTProcessor
+from FFT_Class import FFTProcessor, LASSOFFT
 from Time_Processing.datetime_utils import DatetimeOnehotEncoder
 from workalendar.america import Canada
 from TimeSeries_Class import UnivariateTimeSeries
@@ -203,10 +203,11 @@ def energies_paper_fft_for_ampds2_dataset(sample_period):
     hpe.data[mask] = 0  # type:pd.DataFrame
 
     # 将处理好（p.log，detrend, 部分被置零）的数据进行FFT
-    fft_results = FFTProcessor(mains.data.values.flatten(), sampling_period=sample_period, name='mains')
-    fft_results.plot(save_as_docx_path=save_figure_path / 'mains.docx')
-    fft_results = FFTProcessor(hpe.data.values.flatten(), sampling_period=sample_period, name='hpe')
-    fft_results.plot(save_as_docx_path=save_figure_path / 'hpe.docx')
+    # fft_results = FFTProcessor(mains.data.values.flatten(), sampling_period=sample_period, name='mains')
+    # fft_results.plot(save_as_docx_path=save_figure_path / 'mains.docx')
+    # fft_results = FFTProcessor(hpe.data.values.flatten(), sampling_period=sample_period, name='hpe')
+    # fft_results.plot(save_as_docx_path=save_figure_path / 'hpe.docx')
+    fft_results = LASSOFFT(mains.data.values.flatten(), sampling_period=sample_period, name='mains')
 
 
 def energies_paper_fft_for_scotland():
