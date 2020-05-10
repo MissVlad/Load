@@ -4,6 +4,8 @@
       <w>ampds</w>
       <w>basefmt</w>
       <w>circ</w>
+      <w>clsdict</w>
+      <w>clsobj</w>
       <w>cuda</w>
       <w>datasets</w>
       <w>detrend</w>
@@ -34,6 +36,7 @@
       <w>ofe</w>
       <w>onehot</w>
       <w>pytorch</w>
+      <w>rasterized</w>
       <w>resample</w>
       <w>resampled</w>
       <w>stft</w>
