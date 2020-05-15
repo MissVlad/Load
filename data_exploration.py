@@ -10,7 +10,7 @@ from dateutil import tz
 from project_path_Var import project_path_
 import os
 from TimeSeries_Class import merge_two_time_series_df
-from FFT_Class import FFTProcessor, LASSOFFT
+from FFT_Class import FFTProcessor, STFT
 from Time_Processing.datetime_utils import DatetimeOnehotEncoder
 from workalendar.america import Canada
 from TimeSeries_Class import UnivariateTimeSeries

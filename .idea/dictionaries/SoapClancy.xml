@@ -7,6 +7,9 @@
       <w>clsdict</w>
       <w>clsobj</w>
       <w>cuda</w>
+      <w>dashdot</w>
+      <w>dashdotdotted</w>
+      <w>dashdotted</w>
       <w>datasets</w>
       <w>detrend</w>
       <w>detrended</w>
@@ -19,6 +22,7 @@
       <w>iloc</w>
       <w>isoweekday</w>
       <w>lassofft</w>
+      <w>linestyle</w>
       <w>linestyles</w>
       <w>lstm</w>
       <w>markerfmt</w>
