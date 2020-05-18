@@ -221,7 +221,9 @@ class ScotlandDataset(metaclass=ABCMeta):
         """
         time_index = self._get_time_index()
         holiday_ndarray = self._get_holiday_ndarray()
+        bst_ndarray = self._get_british_summer_time()
         raw_data = pd.DataFrame(data={'holiday': holiday_ndarray,
+                                      'BST': bst_ndarray,
                                       'active power': self.load_active_power_mat()},
                                 index=time_index)
         return raw_data
@@ -261,6 +263,10 @@ class ScotlandDataset(metaclass=ABCMeta):
         """
         ts_matrix = self.load_ts_mat()
         return ts_matrix[:, -1].astype(int)
+
+    def _get_british_summer_time(self) -> ndarray:
+        ts_matrix = self.load_ts_mat()
+        return ts_matrix[:, -2].astype(int)
 
     @abstractmethod
     def load_active_power_mat(self) -> ndarray:

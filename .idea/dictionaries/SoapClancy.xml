@@ -34,15 +34,20 @@
       <w>nbins</w>
       <w>ncol</w>
       <w>ndarray</w>
+      <w>nfft</w>
       <w>nilm</w>
       <w>nilmtk</w>
       <w>normlised</w>
+      <w>noverlap</w>
+      <w>nperseg</w>
       <w>ofe</w>
       <w>onehot</w>
+      <w>pcolormesh</w>
       <w>pytorch</w>
       <w>rasterized</w>
       <w>resample</w>
       <w>resampled</w>
+      <w>scipy</w>
       <w>stft</w>
       <w>stha</w>
       <w>touchtone</w>

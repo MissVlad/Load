@@ -10,7 +10,7 @@ from dateutil import tz
 from project_path_Var import project_path_
 import os
 from TimeSeries_Class import merge_two_time_series_df
-from FFT_Class import FFTProcessor, STFT
+from FFT_Class import FFTProcessor, STFTProcessor
 from Time_Processing.datetime_utils import DatetimeOnehotEncoder
 from workalendar.america import Canada
 from TimeSeries_Class import UnivariateTimeSeries
@@ -203,11 +203,10 @@ def energies_paper_fft_for_ampds2_dataset(sample_period):
     hpe.data[mask] = 0  # type:pd.DataFrame
 
     # 将处理好（p.log，detrend, 部分被置零）的数据进行FFT
-    # fft_results = FFTProcessor(mains.data.values.flatten(), sampling_period=sample_period, name='mains')
-    # fft_results.plot(save_as_docx_path=save_figure_path / 'mains.docx')
-    # fft_results = FFTProcessor(hpe.data.values.flatten(), sampling_period=sample_period, name='hpe')
-    # fft_results.plot(save_as_docx_path=save_figure_path / 'hpe.docx')
-    fft_results = LASSOFFT(mains.data.values.flatten(), sampling_period=sample_period, name='mains')
+    fft_results = FFTProcessor(mains.data.values.flatten(), sampling_period=sample_period, name='mains')
+    fft_results.plot(save_as_docx_path=save_figure_path / 'mains.docx')
+    fft_results = FFTProcessor(hpe.data.values.flatten(), sampling_period=sample_period, name='hpe')
+    fft_results.plot(save_as_docx_path=save_figure_path / 'hpe.docx')
 
 
 def energies_paper_fft_for_scotland():
@@ -222,8 +221,8 @@ def energies_paper_fft_for_scotland():
         this_bus_active_power = UnivariateTimeSeries(
             this_bus.dataset[['active power']].apply(np.log)
         )  # type: UnivariateTimeSeries
-        this_bus_active_power.detrend({'rule': '168H'},  # 以周为单位detrend
-                                      inplace=True)
+        # this_bus_active_power.detrend({'rule': '168H'},  # 以周为单位detrend
+        #                               inplace=True)
         # 画图，一周周的叠加
         # this_bus_active_power.plot_group_by_week(x_label='Day of week',
         #                                          y_label='Detrended log-load',
@@ -231,23 +230,32 @@ def energies_paper_fft_for_scotland():
         #                                          save_format='png')
         # 置零
         this_bus_active_power = this_bus_active_power.data  # type:pd.DataFrame
-        _, zeros_mask = this_bus.set_weekends_and_holiday_to_zeros(inplace=False)
-        this_bus_active_power[zeros_mask] = 0  # type: pd.DataFrame
+        # _, zeros_mask = this_bus.set_weekends_and_holiday_to_zeros(inplace=False)
+        # this_bus_active_power[zeros_mask] = 0  # type: pd.DataFrame
         # 删inf，nan
         this_bus_active_power[np.isinf(this_bus_active_power)] = np.nan
         this_bus_active_power = this_bus_active_power.fillna(0)  # type: pd.DataFrame
         # 开始FFT
-        fft_results = FFTProcessor(this_bus_active_power.values.flatten(),
-                                   sampling_period=60 * 30,
-                                   name=key)
-        fft_results.plot(save_as_docx_path=save_figure_folder_path / f'{key}.docx')
+        # fft_results = FFTProcessor(this_bus_active_power.values.flatten(),
+        #                            sampling_period=60 * 30,
+        #                            name=key)
+        # fft_results.plot(save_as_docx_path=save_figure_folder_path / f'{key}.docx')
+
+        stft_results = STFTProcessor(this_bus_active_power.values.flatten(),
+                                     sampling_period=60 * 30,
+                                     name=key)
+        stft_results.plot_scipy_signal_stft(call_scipy_signal_stft_args={'frequency_unit': '1/day',
+                                                                         'time_axis_denominator': 48 * 3600,
+                                                                         'nperseg': 48,  # 每天有48个记录，window长度=48
+                                                                         'noverlap': 0,  # 不要overlap
+                                                                         'nfft': 48 * 2})  # window中傅里叶的长度
 
 
 def energies_paper():
     # energies_paper_one_day_visulisation_for_ampds2_dataset()
     # energies_paper_correlation_exploration_for_ampds2_dataset()
     # energies_paper_get_category_and_consumption_for_ampds2_dataset()
-    energies_paper_fft_for_ampds2_dataset(60 * 30)
+    # energies_paper_fft_for_ampds2_dataset(60 * 30)
     energies_paper_fft_for_scotland()
 
 
