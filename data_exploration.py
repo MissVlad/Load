@@ -229,19 +229,18 @@ def energies_paper_fft_for_scotland():
         #                                          save_file_=str(save_figure_folder_path / 'detrend_log'),
         #                                          save_format='png')
         # 置零
-        this_bus_active_power = this_bus_active_power.data  # type:pd.DataFrame
         # _, zeros_mask = this_bus.set_weekends_and_holiday_to_zeros(inplace=False)
         # this_bus_active_power[zeros_mask] = 0  # type: pd.DataFrame
         # 删inf，nan
         this_bus_active_power[np.isinf(this_bus_active_power)] = np.nan
-        this_bus_active_power = this_bus_active_power.fillna(0)  # type: pd.DataFrame
+        this_bus_active_power = this_bus_active_power.fillna(0)
         # 开始FFT
         # fft_results = FFTProcessor(this_bus_active_power.values.flatten(),
         #                            sampling_period=60 * 30,
         #                            name=key)
         # fft_results.plot(save_as_docx_path=save_figure_folder_path / f'{key}.docx')
 
-        stft_results = STFTProcessor(this_bus_active_power.values.flatten(),
+        stft_results = STFTProcessor(this_bus_active_power,
                                      sampling_period=60 * 30,
                                      name=key)
         stft_results.plot_scipy_signal_stft(call_scipy_signal_stft_args={'frequency_unit': '1/day',
