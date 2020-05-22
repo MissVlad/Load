@@ -16,18 +16,16 @@
         <item name="GROUP_NODE:origin" type="e8cecc67:BranchNodeDescriptor" />
       </path>
     </expand>
-    <select />
+    <select>
+      <path>
+        <item name="ROOT" type="e8cecc67:BranchNodeDescriptor" />
+        <item name="LOCAL_ROOT" type="e8cecc67:BranchNodeDescriptor" />
+      </path>
+    </select>
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="43c57110-725f-4a7b-90b7-cc09d5a22551" name="Default Changelist" comment="">
-      <change beforePath="$PROJECT_DIR$/data_exploration.py" beforeDir="false" afterPath="$PROJECT_DIR$/data_exploration.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../../../Python_Project_common_package/FFT_Class.py" beforeDir="false" afterPath="$PROJECT_DIR$/../../../Python_Project_common_package/FFT_Class.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../../../Python_Project_common_package/Ploting/adjust_Func.py" beforeDir="false" afterPath="$PROJECT_DIR$/../../../Python_Project_common_package/Ploting/adjust_Func.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../../../Python_Project_common_package/Ploting/utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/../../../Python_Project_common_package/Ploting/utils.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../../../Python_Project_common_package/TimeSeries_Class.py" beforeDir="false" afterPath="$PROJECT_DIR$/../../../Python_Project_common_package/TimeSeries_Class.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../../../Python_Project_common_package/Time_Processing/datetime_utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/../../../Python_Project_common_package/Time_Processing/datetime_utils.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../../../Python_Project_common_package/Time_Processing/format_convert_Func.py" beforeDir="false" afterPath="$PROJECT_DIR$/../../../Python_Project_common_package/Time_Processing/format_convert_Func.py" afterDir="false" />
-    </list>
+    <list default="true" id="43c57110-725f-4a7b-90b7-cc09d5a22551" name="Default Changelist" comment="1) flexible windowed class and __iter__, suitable for STFT, considering various window types;&#10;2) adjust_Func.py updated for convenient adjust AxesSubplot;&#10;3) full manual STFT results, NB: rectangle window is the best;&#10;4) scipy.signal.find_peaks must be added to FFTProcessor class" />
+    <list id="a096d756-1ac3-4293-a23d-21926fc15656" name="1) flexible windowed class and __iter__, suitable for STFT, considering various window types; 2) adjust_Func.py updated for convenient adjust AxesSubplot; 3) full manual STFT results, NB: rectangle window is the best; 4) scipy.signal.find_peaks must be added to FFTProcessor class" comment="" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -48,6 +46,7 @@
     <option name="hiddenUrls">
       <set>
         <option value="git@github.com:SoapClancy/Load" />
+        <option value="git@github.com:SoapClancy/Python_Project_common_package" />
       </set>
     </option>
   </component>
@@ -59,6 +58,7 @@
   </component>
   <component name="PropertiesComponent">
     <property name="ASKED_ADD_EXTERNAL_FILES" value="true" />
+    <property name="ChangesTree.GroupingKeys" value="repository" />
     <property name="RunOnceActivity.OpenProjectViewOnStart" value="true" />
     <property name="RunOnceActivity.ShowReadmeOnStart" value="true" />
     <property name="WebServerToolWindowFactoryState" value="false" />
@@ -166,6 +166,7 @@
   <component name="TaskManager">
     <task active="true" id="Default" summary="Default task">
       <changelist id="43c57110-725f-4a7b-90b7-cc09d5a22551" name="Default Changelist" comment="" />
+      <changelist id="a096d756-1ac3-4293-a23d-21926fc15656" name="1) flexible windowed class and __iter__, suitable for STFT, considering various window types; 2) adjust_Func.py updated for convenient adjust AxesSubplot; 3) full manual STFT results, NB: rectangle window is the best; 4) scipy.signal.find_peaks must be added to FFTProcessor class" comment="" />
       <created>1586974256472</created>
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
@@ -222,7 +223,7 @@
       <workItem from="1590053814674" duration="2191000" />
       <workItem from="1590056182722" duration="3564000" />
       <workItem from="1590061022833" duration="10499000" />
-      <workItem from="1590149190956" duration="19478000" />
+      <workItem from="1590149190956" duration="20147000" />
     </task>
     <task id="LOCAL-00001" summary="n/a">
       <created>1588669410795</created>
@@ -280,7 +281,21 @@
       <option name="project" value="LOCAL" />
       <updated>1590072276634</updated>
     </task>
-    <option name="localTasksCounter" value="9" />
+    <task id="LOCAL-00009" summary="manual stft">
+      <created>1590181068958</created>
+      <option name="number" value="00009" />
+      <option name="presentableId" value="LOCAL-00009" />
+      <option name="project" value="LOCAL" />
+      <updated>1590181068958</updated>
+    </task>
+    <task id="LOCAL-00010" summary="1) flexible windowed class and __iter__, suitable for STFT, considering various window types;&#10;2) adjust_Func.py updated for convenient adjust AxesSubplot;&#10;3) full manual STFT results, NB: rectangle window is the best;&#10;4) scipy.signal.find_peaks must be added to FFTProcessor class">
+      <created>1590181471304</created>
+      <option name="number" value="00010" />
+      <option name="presentableId" value="LOCAL-00010" />
+      <option name="project" value="LOCAL" />
+      <updated>1590181471304</updated>
+    </task>
+    <option name="localTasksCounter" value="11" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -302,18 +317,19 @@
     <option name="LOCAL_CHANGES_DETAILS_PREVIEW_SHOWN" value="false" />
     <MESSAGE value="metaprograming_boilerplate" />
     <MESSAGE value="n/a" />
-    <MESSAGE value="manual stft" />
-    <option name="LAST_COMMIT_MESSAGE" value="manual stft" />
+    <MESSAGE value="1) flexible windowed class and __iter__, suitable for STFT, considering various window types;&#10;2) adjust_Func.py updated for convenient adjust AxesSubplot;&#10;3) full manual STFT results, NB: rectangle window is the best;&#10;4)" />
+    <MESSAGE value="1) flexible windowed class and __iter__, suitable for STFT, considering various window types;&#10;2) adjust_Func.py updated for convenient adjust AxesSubplot;&#10;3) full manual STFT results, NB: rectangle window is the best;&#10;4) scipy.signal.find_peaks must be added to FFTProcessor class" />
+    <option name="LAST_COMMIT_MESSAGE" value="1) flexible windowed class and __iter__, suitable for STFT, considering various window types;&#10;2) adjust_Func.py updated for convenient adjust AxesSubplot;&#10;3) full manual STFT results, NB: rectangle window is the best;&#10;4) scipy.signal.find_peaks must be added to FFTProcessor class" />
   </component>
   <component name="WindowStateProjectService">
     <state x="1807" y="350" key="#Menus_and_Toolbars" timestamp="1586985609231">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
     <state x="1807" y="350" key="#Menus_and_Toolbars/0.0.3440.1400@0.0.3440.1400" timestamp="1586985609231" />
-    <state x="487" y="438" width="1429" height="634" key="#Notifications" timestamp="1589362932787">
+    <state x="487" y="438" width="1429" height="634" key="#Notifications" timestamp="1590181408087">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
-    <state x="487" y="438" width="1429" height="634" key="#Notifications/0.0.3440.1400@0.0.3440.1400" timestamp="1589362932787" />
+    <state x="487" y="438" width="1429" height="634" key="#Notifications/0.0.3440.1400@0.0.3440.1400" timestamp="1590181408087" />
     <state x="1018" y="265" width="1412" height="756" key="#com.intellij.execution.impl.EditConfigurationsDialog" timestamp="1590057609615">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
@@ -346,62 +362,78 @@
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
     <state x="1761" y="602" key="ANALYSIS_DLG_com.intellij.analysis.BaseAnalysisAction$1/0.0.3440.1400@0.0.3440.1400" timestamp="1588681133106" />
-    <state x="1446" y="184" key="CommitChangelistDialog2" timestamp="1590072275650">
+    <state x="1446" y="184" width="1756" height="1033" key="CommitChangelistDialog2" timestamp="1590181042857">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
-    <state x="1446" y="184" key="CommitChangelistDialog2/0.0.3440.1400@0.0.3440.1400" timestamp="1590072275650" />
+    <state x="1446" y="184" width="1756" height="1033" key="CommitChangelistDialog2/0.0.3440.1400@0.0.3440.1400" timestamp="1590181042857" />
     <state width="2076" height="646" key="DebuggerActiveHint" timestamp="1590157571422">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
     <state width="2076" height="646" key="DebuggerActiveHint/0.0.3440.1400@0.0.3440.1400" timestamp="1590157571422" />
-    <state x="582" y="169" width="2384" height="1023" key="DiffContextDialog" timestamp="1588681211650">
+    <state x="582" y="169" width="2384" height="1023" key="DiffContextDialog" timestamp="1590181516025">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
-    <state x="582" y="169" width="2384" height="1023" key="DiffContextDialog/0.0.3440.1400@0.0.3440.1400" timestamp="1588681211650" />
+    <state x="582" y="169" width="2384" height="1023" key="DiffContextDialog/0.0.3440.1400@0.0.3440.1400" timestamp="1590181516025" />
     <state x="1804" y="478" key="FileChooserDialogImpl" timestamp="1590079441106">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
     <state x="1804" y="478" key="FileChooserDialogImpl/0.0.3440.1400@0.0.3440.1400" timestamp="1590079441106" />
-    <state width="2499" height="371" key="GridCell.Tab.0.bottom" timestamp="1590177900184">
+    <state x="1786" y="631" key="GitRewordDialog" timestamp="1590181358477">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
-    <state width="2499" height="371" key="GridCell.Tab.0.bottom/0.0.3440.1400@0.0.3440.1400" timestamp="1590177900184" />
-    <state width="2499" height="371" key="GridCell.Tab.0.center" timestamp="1590177900184">
+    <state x="1786" y="631" key="GitRewordDialog/0.0.3440.1400@0.0.3440.1400" timestamp="1590181358477" />
+    <state width="2499" height="371" key="GridCell.Tab.0.bottom" timestamp="1590181184812">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
-    <state width="2499" height="371" key="GridCell.Tab.0.center/0.0.3440.1400@0.0.3440.1400" timestamp="1590177900184" />
-    <state width="2499" height="371" key="GridCell.Tab.0.left" timestamp="1590177900183">
+    <state width="2499" height="371" key="GridCell.Tab.0.bottom/0.0.3440.1400@0.0.3440.1400" timestamp="1590181184812" />
+    <state width="2499" height="371" key="GridCell.Tab.0.center" timestamp="1590181184812">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
-    <state width="2499" height="371" key="GridCell.Tab.0.left/0.0.3440.1400@0.0.3440.1400" timestamp="1590177900183" />
-    <state width="2499" height="371" key="GridCell.Tab.0.right" timestamp="1590177900184">
+    <state width="2499" height="371" key="GridCell.Tab.0.center/0.0.3440.1400@0.0.3440.1400" timestamp="1590181184812" />
+    <state width="2499" height="371" key="GridCell.Tab.0.left" timestamp="1590181184812">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
-    <state width="2499" height="371" key="GridCell.Tab.0.right/0.0.3440.1400@0.0.3440.1400" timestamp="1590177900184" />
-    <state width="2499" height="371" key="GridCell.Tab.1.bottom" timestamp="1590177906675">
+    <state width="2499" height="371" key="GridCell.Tab.0.left/0.0.3440.1400@0.0.3440.1400" timestamp="1590181184812" />
+    <state width="2499" height="371" key="GridCell.Tab.0.right" timestamp="1590181184812">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
-    <state width="2499" height="371" key="GridCell.Tab.1.bottom/0.0.3440.1400@0.0.3440.1400" timestamp="1590177906675" />
-    <state width="2499" height="371" key="GridCell.Tab.1.center" timestamp="1590177906675">
+    <state width="2499" height="371" key="GridCell.Tab.0.right/0.0.3440.1400@0.0.3440.1400" timestamp="1590181184812" />
+    <state width="2499" height="371" key="GridCell.Tab.1.bottom" timestamp="1590181184813">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
-    <state width="2499" height="371" key="GridCell.Tab.1.center/0.0.3440.1400@0.0.3440.1400" timestamp="1590177906675" />
-    <state width="2499" height="371" key="GridCell.Tab.1.left" timestamp="1590177906675">
+    <state width="2499" height="371" key="GridCell.Tab.1.bottom/0.0.3440.1400@0.0.3440.1400" timestamp="1590181184813" />
+    <state width="2499" height="371" key="GridCell.Tab.1.center" timestamp="1590181184813">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
-    <state width="2499" height="371" key="GridCell.Tab.1.left/0.0.3440.1400@0.0.3440.1400" timestamp="1590177906675" />
-    <state width="2499" height="371" key="GridCell.Tab.1.right" timestamp="1590177906675">
+    <state width="2499" height="371" key="GridCell.Tab.1.center/0.0.3440.1400@0.0.3440.1400" timestamp="1590181184813" />
+    <state width="2499" height="371" key="GridCell.Tab.1.left" timestamp="1590181184812">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
-    <state width="2499" height="371" key="GridCell.Tab.1.right/0.0.3440.1400@0.0.3440.1400" timestamp="1590177906675" />
+    <state width="2499" height="371" key="GridCell.Tab.1.left/0.0.3440.1400@0.0.3440.1400" timestamp="1590181184812" />
+    <state width="2499" height="371" key="GridCell.Tab.1.right" timestamp="1590181184813">
+      <screen x="0" y="0" width="3440" height="1400" />
+    </state>
+    <state width="2499" height="371" key="GridCell.Tab.1.right/0.0.3440.1400@0.0.3440.1400" timestamp="1590181184813" />
+    <state x="1623" y="356" key="RollbackChangesDialog" timestamp="1590181160153">
+      <screen x="0" y="0" width="3440" height="1400" />
+    </state>
+    <state x="1623" y="356" key="RollbackChangesDialog/0.0.3440.1400@0.0.3440.1400" timestamp="1590181160153" />
     <state x="1151" y="484" key="SettingsEditor" timestamp="1589883517091">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
     <state x="1151" y="484" key="SettingsEditor/0.0.3440.1400@0.0.3440.1400" timestamp="1589883517091" />
-    <state x="1577" y="434" key="Vcs.Push.Dialog.v2" timestamp="1590072280424">
+    <state x="1805" y="646" width="701" height="359" key="VCS.ChangelistChooser" timestamp="1590181450222">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
-    <state x="1577" y="434" key="Vcs.Push.Dialog.v2/0.0.3440.1400@0.0.3440.1400" timestamp="1590072280424" />
+    <state x="1805" y="646" width="701" height="359" key="VCS.ChangelistChooser/0.0.3440.1400@0.0.3440.1400" timestamp="1590181450222" />
+    <state x="1577" y="434" key="Vcs.Push.Dialog.v2" timestamp="1590181484564">
+      <screen x="0" y="0" width="3440" height="1400" />
+    </state>
+    <state x="1577" y="434" key="Vcs.Push.Dialog.v2/0.0.3440.1400@0.0.3440.1400" timestamp="1590181484564" />
+    <state x="1434" y="390" key="VcsDiffUtil.ChangesDialog" timestamp="1590181346690">
+      <screen x="0" y="0" width="3440" height="1400" />
+    </state>
+    <state x="1434" y="390" key="VcsDiffUtil.ChangesDialog/0.0.3440.1400@0.0.3440.1400" timestamp="1590181346690" />
     <state width="1309" height="660" key="XDebugger.FullValuePopup" timestamp="1590151127980">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
