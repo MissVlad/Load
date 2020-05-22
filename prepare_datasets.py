@@ -137,7 +137,6 @@ class NILMTorchDataset(TorchDataSet):
         # 最后进行transform
         self.transformed_data = self._transform(transform_args_file_path)  # type: Tuple[torch.tensor, torch.tensor]
 
-
     def __len__(self):
         if self.over_lapping:
             return self.data.__len__() - self.sequence_length + 1
