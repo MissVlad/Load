@@ -16,6 +16,8 @@ from workalendar.america import Canada
 from TimeSeries_Class import UnivariateTimeSeries
 from pathlib import Path
 import datetime
+from Correlation_Modeling.FFTCorrelation_Class import BivariateFFTCorrelation
+from scipy.stats import pearsonr, spearmanr, kendalltau
 
 
 def plot_active_power_for_meter_group(meter_group: MeterGroup, sample_period=60, **kwargs):
@@ -261,12 +263,29 @@ def energies_paper_fft_for_scotland():
                                                plot_args=None)
 
 
+def energies_paper_fft_correlation():
+    considered_bus = {'JOHN': ScotlandLongerDataset('John'),
+                      'DRUM': ScotlandLongerDataset('Drum'),
+                      'MAYB': ScotlandShorterDataset('MAYB'),
+                      'STHA': ScotlandShorterDataset('STHA')}
+    for key, this_bus in considered_bus.items():
+        """
+        目前只考虑John
+        """
+        if key != 'JOHN':
+            continue
+        b_fft_correlation = BivariateFFTCorrelation(main_time_series_df=this_bus.dataset[['active power']],
+                                                    vice_time_series_df=this_bus.dataset[['temperature']],
+                                                    correlation_func=(spearmanr,))
+
+
 def energies_paper():
     # energies_paper_one_day_visulisation_for_ampds2_dataset()
     # energies_paper_correlation_exploration_for_ampds2_dataset()
     # energies_paper_get_category_and_consumption_for_ampds2_dataset()
     # energies_paper_fft_for_ampds2_dataset(60 * 30)
-    energies_paper_fft_for_scotland()
+    # energies_paper_fft_for_scotland()
+    energies_paper_fft_correlation()
 
 
 if __name__ == '__main__':

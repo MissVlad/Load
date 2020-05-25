@@ -224,7 +224,8 @@ class ScotlandDataset(metaclass=ABCMeta):
         bst_ndarray = self._get_british_summer_time()
         raw_data = pd.DataFrame(data={'holiday': holiday_ndarray,
                                       'BST': bst_ndarray,
-                                      'active power': self.load_active_power_mat()},
+                                      'active power': self.load_active_power_mat(),
+                                      'temperature': self.get_temperature()},
                                 index=time_index)
         return raw_data
 
@@ -282,6 +283,13 @@ class ScotlandDataset(metaclass=ABCMeta):
         """
         pass
 
+    @abstractmethod
+    def get_temperature(self) -> ndarray:
+        """
+        载入Data_temperature_modified.mat或者Data_temperature.mat
+        """
+        pass
+
 
 class ScotlandLongerDataset(ScotlandDataset):
     """
@@ -302,6 +310,9 @@ class ScotlandLongerDataset(ScotlandDataset):
     def load_ts_mat(self) -> ndarray:
         return loadmat(self.matlab_mat_file_folder / 'Data_ts_modified.mat')['ts']
 
+    def get_temperature(self) -> ndarray:
+        return loadmat(self.matlab_mat_file_folder / 'Data_temperature_modified.mat')['temperature'].flatten()
+
 
 class ScotlandShorterDataset(ScotlandDataset):
     """
@@ -318,6 +329,9 @@ class ScotlandShorterDataset(ScotlandDataset):
 
     def load_ts_mat(self) -> ndarray:
         return loadmat(self.matlab_mat_file_folder / 'Data_ts.mat')['ts']
+
+    def get_temperature(self) -> ndarray:
+        return loadmat(self.matlab_mat_file_folder / 'Data_temperature.mat')['temperature'].flatten()
 
 
 if __name__ == '__main__':
