@@ -241,15 +241,24 @@ def energies_paper_fft_for_scotland():
         #                            name=key)
         # fft_results.plot(save_as_docx_path=save_figure_folder_path / f'{key}.docx')
 
-        stft_results = STFTProcessor(this_bus_active_power,
-                                     sampling_period=60 * 30,
-                                     name=key)
-        # stft_results.plot_scipy_signal_stft_aggregated(call_scipy_signal_stft_args={'frequency_unit': '1/day',
-        #                                                                             'time_axis_denominator': 48 * 3600,
-        #                                                                             'nperseg': 48,  # 每天有48个记录，
-        #                                                                             'noverlap': 0,  # 不要overlap
-        #                                                                             'nfft': 48 * 2})  # window中傅里叶长
-        stft_results.plot_scipy_signal_stft(window_length=datetime.timedelta(days=1), window=None)
+        stft_class = STFTProcessor(this_bus_active_power,
+                                   sampling_period=60 * 30,
+                                   name=key,
+                                   window_length=datetime.timedelta(days=1),
+                                   window=None)
+        stft_class.do_stft(2 ** 16)
+        """
+        stft_class.find_peaks_of_fft_frequency('1/half day',
+                                       considered_window_index=(7, 182),
+                                       plot_args={'only_plot_peaks': True,
+                                                  'annotation_for_peak_f_axis_indices': (1, 2),
+                                                  'annotation_y_offset_for_f': (70, 50),
+                                                  'annotation_y_offset_for_p': (0.5, -0.2)})
+        """
+
+        stft_class.find_peaks_of_fft_frequency('1/half day',
+                                               considered_window_index=range(365),
+                                               plot_args=None)
 
 
 def energies_paper():
