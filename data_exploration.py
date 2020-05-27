@@ -16,8 +16,8 @@ from workalendar.america import Canada
 from TimeSeries_Class import UnivariateTimeSeries
 from pathlib import Path
 import datetime
-from Correlation_Modeling.FFTCorrelation_Class import BivariateFFTCorrelation
-from scipy.stats import pearsonr, spearmanr, kendalltau
+from Correlation_Modeling.FFTCorrelation_Class import BivariateFFTCorrelation, FFTCorrelation
+from TimeSeries_Class import WindowedTimeSeries
 
 
 def plot_active_power_for_meter_group(meter_group: MeterGroup, sample_period=60, **kwargs):
@@ -274,9 +274,17 @@ def energies_paper_fft_correlation():
         """
         if key != 'JOHN':
             continue
-        b_fft_correlation = BivariateFFTCorrelation(main_time_series_df=this_bus.dataset[['active power']],
-                                                    vice_time_series_df=this_bus.dataset[['temperature']],
-                                                    correlation_func=(spearmanr,))
+        bivariate_time_series = merge_two_time_series_df(this_bus.dataset[['active power']],
+                                                         this_bus.dataset[['temperature']])
+        bivariate_time_series = WindowedTimeSeries(bivariate_time_series, window_length=datetime.timedelta(days=1))
+        for i, this_day in enumerate(bivariate_time_series):
+            b_fft_correlation = BivariateFFTCorrelation(n_fft=65_536,
+                                                        considered_frequency_unit='1/half day',
+                                                        _time_series=this_day,
+                                                        correlation_func=('Spearman',),
+                                                        main_considered_peaks_index=(1, 2, 3, 4),
+                                                        vice_considered_peaks_index=(1, 2, 3, 4))
+            b_fft_correlation.corr_between_pairwise_peaks_f()
 
 
 def energies_paper():
