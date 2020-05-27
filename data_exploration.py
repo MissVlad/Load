@@ -218,6 +218,11 @@ def energies_paper_fft_for_scotland():
                       'MAYB': ScotlandShorterDataset('MAYB'),
                       'STHA': ScotlandShorterDataset('STHA')}
     for key, this_bus in considered_bus.items():
+        """
+        目前只考虑John
+        """
+        if key != 'JOHN':
+            continue
         save_figure_folder_path = Path(project_path_) / f'Data/Results/Energies_paper/fft/{key}'
         save_figure_folder_path.mkdir(parents=True, exist_ok=True)
         # np.log, detrend
@@ -278,13 +283,29 @@ def energies_paper_fft_correlation():
                                                          this_bus.dataset[['temperature']])
         bivariate_time_series = WindowedTimeSeries(bivariate_time_series, window_length=datetime.timedelta(days=1))
         for i, this_day in enumerate(bivariate_time_series):
+            """
+            目前只考虑day7, day189
+            """
+            if i not in (189, ):
+                continue
             b_fft_correlation = BivariateFFTCorrelation(n_fft=65_536,
                                                         considered_frequency_unit='1/half day',
                                                         _time_series=this_day,
                                                         correlation_func=('Spearman',),
                                                         main_considered_peaks_index=(1, 2, 3, 4),
                                                         vice_considered_peaks_index=(1, 2, 3, 4))
-            b_fft_correlation.corr_between_pairwise_peaks_f()
+                                                        # main_find_peaks_args={
+                                                        #     'plot_args': {
+                                                        #         'only_plot_peaks': True,
+                                                        #         'overridden_plot_x_lim': (None, None),
+                                                        #         'annotation_for_peak_f_axis_indices': (1, 2),
+                                                        #         'annotation_y_offset_for_f': (700, 500),
+                                                        #         'annotation_y_offset_for_p': (0.1, -0.1)
+                                                        #     }
+                                                        # })
+            # b_fft_correlation.corr_between_pairwise_peaks_f()
+            b_fft_correlation.corr_between_main_peaks_f_and_vice()
+            # b_fft_correlation.corr_between_combined_main_peaks_f_and_vice()
 
 
 def energies_paper():
@@ -292,8 +313,8 @@ def energies_paper():
     # energies_paper_correlation_exploration_for_ampds2_dataset()
     # energies_paper_get_category_and_consumption_for_ampds2_dataset()
     # energies_paper_fft_for_ampds2_dataset(60 * 30)
-    # energies_paper_fft_for_scotland()
-    energies_paper_fft_correlation()
+    energies_paper_fft_for_scotland()
+    # energies_paper_fft_correlation()
 
 
 if __name__ == '__main__':
