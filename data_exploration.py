@@ -13,11 +13,12 @@ from TimeSeries_Class import merge_two_time_series_df
 from FFT_Class import FFTProcessor, STFTProcessor
 from Time_Processing.datetime_utils import DatetimeOnehotEncoder
 from workalendar.america import Canada
-from TimeSeries_Class import UnivariateTimeSeries
+from TimeSeries_Class import UnivariateTimeSeries, TimeSeries, WindowedTimeSeries
 from pathlib import Path
 import datetime
 from Correlation_Modeling.FFTCorrelation_Class import BivariateFFTCorrelation, FFTCorrelation
-from TimeSeries_Class import WindowedTimeSeries
+import re
+from Writting.utils import put_all_png_in_a_path_into_a_docx
 
 
 def plot_active_power_for_meter_group(meter_group: MeterGroup, sample_period=60, **kwargs):
@@ -286,26 +287,70 @@ def energies_paper_fft_correlation():
             """
             目前只考虑day7, day189
             """
-            if i not in (189, ):
+            if i not in (7, 77, 189, 280):
                 continue
+            # load_time_series的一些图
+            load_time_series = UnivariateTimeSeries(this_day.iloc[:, 0])
+            # load_title = f"Load, original, starting from {load_time_series.first_valid_index()}"
+            # series(np.arange(0, 24, 0.5), load_time_series.values.flatten(),
+            #        x_label='Hour', y_label='Active load (MW)',
+            #        title=load_title,
+            #        save_file_=f'{project_path_}Code/temp/load_{i}',
+            #        save_format='png')
+            # load_time_series_fft = FFTProcessor(load_time_series.values.flatten(),
+            #                                     sampling_period=load_time_series.adjacent_recordings_timedelta.seconds,
+            #                                     n_fft=65536,
+            #                                     name='')
+            # plot_args = {'only_plot_peaks': True,
+            #              'overridden_plot_x_lim': (None, None)}
+            # for i_unit, unit in enumerate(('1/day', '1/half day')):
+            #     _, _, f_plot, p_plot = load_time_series_fft.find_peaks_of_fft_frequency(considered_frequency_unit=unit,
+            #                                                                             plot_args=plot_args,
+            #                                                                             base_freq_is_a_peak=False)
+            #     f_plot.set_title(load_title)
+            #     p_plot.set_title(load_title)
+            #
+            #     plt.savefig(f'{project_path_}Code/temp/load_{i}_{i_unit}_p.png', format='png', dpi=300)
+            #     plt.close()
+            #     plt.savefig(f'{project_path_}Code/temp/load_{i}_{i_unit}_f.png', format='png', dpi=300)
+
+            # load_time_series_reconstruct的一些图
+            # load_time_series_reconstruct = load_time_series.reconstruct_using_ift(
+            #     n_fft=65_536,
+            #     find_peaks_of_fft_frequency_args={
+            #         'considered_frequency_unit': '1/half day'
+            #     },
+            #     considered_peaks_index=list(range(0, 24)),
+            #     do_plotting=True,
+            #     scale_to_minus_plus_one_flag=False
+            # )
+            # plt.savefig(f'{project_path_}Code/temp/load_{i}.svg', format='svg', dpi=300)
+
+            # series(np.arange(0, 24, 0.5), load_time_series_reconstruct[0],
+            #        x_label='Hour', y_label='Active load (MW)',
+            #        title=re.sub(r"original", 'ifft (rescaled)', load_title),
+            #        save_file_=f'{project_path_}Code/temp/load_{i}_',
+            #        save_format='png')
+
             b_fft_correlation = BivariateFFTCorrelation(n_fft=65_536,
                                                         considered_frequency_unit='1/half day',
                                                         _time_series=this_day,
                                                         correlation_func=('Spearman',),
-                                                        main_considered_peaks_index=(1, 2, 3, 4),
-                                                        vice_considered_peaks_index=(1, 2, 3, 4))
-                                                        # main_find_peaks_args={
-                                                        #     'plot_args': {
-                                                        #         'only_plot_peaks': True,
-                                                        #         'overridden_plot_x_lim': (None, None),
-                                                        #         'annotation_for_peak_f_axis_indices': (1, 2),
-                                                        #         'annotation_y_offset_for_f': (700, 500),
-                                                        #         'annotation_y_offset_for_p': (0.1, -0.1)
-                                                        #     }
-                                                        # })
-            # b_fft_correlation.corr_between_pairwise_peaks_f()
-            b_fft_correlation.corr_between_main_peaks_f_and_vice()
-            # b_fft_correlation.corr_between_combined_main_peaks_f_and_vice()
+                                                        main_considered_peaks_index=list(range(1, 7)),
+                                                        vice_considered_peaks_index=list(range(1, 7)),
+                                                        )
+            # vice_find_peaks_args={
+            #     'plot_args': {
+            #         'only_plot_peaks': True,
+            #         'overridden_plot_x_lim': (None, None),
+            #         'annotation_for_peak_f_axis_indices': (1, 2),
+            #         'annotation_y_offset_for_f': (70, 50),
+            #         'annotation_y_offset_for_p': (0.1, -0.1)
+            #     }
+            # })
+            # b_fft_correlation.corr_between_pairwise_peak_f_ifft()
+            # b_fft_correlation.corr_between_main_and_one_selected_vice_peak_f_ifft()
+            b_fft_correlation.corr_between_main_and_combined_selected_vice_peaks_f_ifft()
 
 
 def energies_paper():
@@ -313,8 +358,8 @@ def energies_paper():
     # energies_paper_correlation_exploration_for_ampds2_dataset()
     # energies_paper_get_category_and_consumption_for_ampds2_dataset()
     # energies_paper_fft_for_ampds2_dataset(60 * 30)
-    energies_paper_fft_for_scotland()
-    # energies_paper_fft_correlation()
+    # energies_paper_fft_for_scotland()
+    energies_paper_fft_correlation()
 
 
 if __name__ == '__main__':
