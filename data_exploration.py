@@ -282,7 +282,9 @@ def energies_paper_fft_correlation():
             continue
         bivariate_time_series = merge_two_time_series_df(this_bus.dataset[['active power']],
                                                          this_bus.dataset[['temperature']])
-        bivariate_time_series = WindowedTimeSeries(bivariate_time_series, window_length=datetime.timedelta(days=1))
+        bivariate_time_series = WindowedTimeSeries({'main': bivariate_time_series['temperature'],
+                                                    'vice': bivariate_time_series['active power']},
+                                                   window_length=datetime.timedelta(days=1))
         for i, this_day in enumerate(bivariate_time_series):
             """
             目前只考虑day7, day189
@@ -350,7 +352,10 @@ def energies_paper_fft_correlation():
             # })
             # b_fft_correlation.corr_between_pairwise_peak_f_ifft()
             # b_fft_correlation.corr_between_main_and_one_selected_vice_peak_f_ifft()
-            b_fft_correlation.corr_between_main_and_combined_selected_vice_peaks_f_ifft()
+            b_fft_correlation.corr_between_main_and_combined_selected_vice_peaks_f_ifft(
+                vice_extra_hz_f=[1 / (365 * 24 * 3600),
+                                 1 / (7 * 24 * 3600)]
+            )
 
 
 def energies_paper():
