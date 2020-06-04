@@ -354,7 +354,8 @@ def energies_paper_fft_correlation():
             # b_fft_correlation.corr_between_main_and_one_selected_vice_peak_f_ifft()
             b_fft_correlation.corr_between_main_and_combined_selected_vice_peaks_f_ifft(
                 vice_extra_hz_f=[1 / (365 * 24 * 3600),
-                                 1 / (7 * 24 * 3600)]
+                                 1 / (7 * 24 * 3600)],
+                do_bayesian_fitting_args={}
             )
 
 
