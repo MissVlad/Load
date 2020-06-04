@@ -309,7 +309,7 @@
       <workItem from="1591117403254" duration="13793000" />
       <workItem from="1591263477282" duration="15671000" />
       <workItem from="1591287644980" duration="453000" />
-      <workItem from="1591297164344" duration="8310000" />
+      <workItem from="1591297164344" duration="10120000" />
     </task>
     <task id="LOCAL-00001" summary="n/a">
       <created>1588669410795</created>
@@ -472,7 +472,14 @@
       <option name="project" value="LOCAL" />
       <updated>1591288003846</updated>
     </task>
-    <option name="localTasksCounter" value="24" />
+    <task id="LOCAL-00024" summary="New age! First Bayesian model has been implemented! Bayesian LASSO FFT is now available. Next step should be improve the performance of MCMC">
+      <created>1591305847513</created>
+      <option name="number" value="00024" />
+      <option name="presentableId" value="LOCAL-00024" />
+      <option name="project" value="LOCAL" />
+      <updated>1591305847513</updated>
+    </task>
+    <option name="localTasksCounter" value="25" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -518,7 +525,8 @@
     <MESSAGE value="regular updates" />
     <MESSAGE value="1) Done with 'corr_between_main_and_combined_selected_vice_peaks_f_ifft' method in BivariateFFTCorrelation instance object.&#10;&#10;2) Add selector to SCFormFourierSeriesProcessor instance object." />
     <MESSAGE value="BayesianFFT abstract has been added. It has been successfully tested in scratch.py. And it will be fully implemented tomorrow. New age begins!" />
-    <option name="LAST_COMMIT_MESSAGE" value="BayesianFFT abstract has been added. It has been successfully tested in scratch.py. And it will be fully implemented tomorrow. New age begins!" />
+    <MESSAGE value="New age! First Bayesian model has been implemented! Bayesian LASSO FFT is now available. Next step should be improve the performance of MCMC" />
+    <option name="LAST_COMMIT_MESSAGE" value="New age! First Bayesian model has been implemented! Bayesian LASSO FFT is now available. Next step should be improve the performance of MCMC" />
   </component>
   <component name="WindowStateProjectService">
     <state x="1807" y="350" key="#Menus_and_Toolbars" timestamp="1586985609231">
@@ -561,10 +569,10 @@
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
     <state x="1344" y="381" key="#xdebugger.XInspectDialog/0.0.3440.1400@0.0.3440.1400" timestamp="1591284397320" />
-    <state x="726" y="212" width="1202" height="899" key="#xdebugger.evaluate" timestamp="1591305401397">
+    <state x="2062" y="501" width="1202" height="899" key="#xdebugger.evaluate" timestamp="1591309054817">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
-    <state x="726" y="212" width="1202" height="899" key="#xdebugger.evaluate/0.0.3440.1400@0.0.3440.1400" timestamp="1591305401397" />
+    <state x="2062" y="501" width="1202" height="899" key="#xdebugger.evaluate/0.0.3440.1400@0.0.3440.1400" timestamp="1591309054817" />
     <state x="1761" y="602" key="ANALYSIS_DLG_com.intellij.analysis.BaseAnalysisAction$1" timestamp="1588681133106">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
@@ -589,38 +597,38 @@
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
     <state x="1786" y="631" key="GitRewordDialog/0.0.3440.1400@0.0.3440.1400" timestamp="1590181358477" />
-    <state width="2492" height="408" key="GridCell.Tab.0.bottom" timestamp="1591304789611">
+    <state width="2492" height="408" key="GridCell.Tab.0.bottom" timestamp="1591305874663">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
-    <state width="2492" height="408" key="GridCell.Tab.0.bottom/0.0.3440.1400@0.0.3440.1400" timestamp="1591304789611" />
-    <state width="2492" height="408" key="GridCell.Tab.0.center" timestamp="1591304789611">
+    <state width="2492" height="408" key="GridCell.Tab.0.bottom/0.0.3440.1400@0.0.3440.1400" timestamp="1591305874663" />
+    <state width="2492" height="408" key="GridCell.Tab.0.center" timestamp="1591305874662">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
-    <state width="2492" height="408" key="GridCell.Tab.0.center/0.0.3440.1400@0.0.3440.1400" timestamp="1591304789611" />
-    <state width="2492" height="408" key="GridCell.Tab.0.left" timestamp="1591304789611">
+    <state width="2492" height="408" key="GridCell.Tab.0.center/0.0.3440.1400@0.0.3440.1400" timestamp="1591305874662" />
+    <state width="2492" height="408" key="GridCell.Tab.0.left" timestamp="1591305874662">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
-    <state width="2492" height="408" key="GridCell.Tab.0.left/0.0.3440.1400@0.0.3440.1400" timestamp="1591304789611" />
-    <state width="2492" height="408" key="GridCell.Tab.0.right" timestamp="1591304789611">
+    <state width="2492" height="408" key="GridCell.Tab.0.left/0.0.3440.1400@0.0.3440.1400" timestamp="1591305874662" />
+    <state width="2492" height="408" key="GridCell.Tab.0.right" timestamp="1591305874662">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
-    <state width="2492" height="408" key="GridCell.Tab.0.right/0.0.3440.1400@0.0.3440.1400" timestamp="1591304789611" />
-    <state width="2492" height="408" key="GridCell.Tab.1.bottom" timestamp="1591305217790">
+    <state width="2492" height="408" key="GridCell.Tab.0.right/0.0.3440.1400@0.0.3440.1400" timestamp="1591305874662" />
+    <state width="2492" height="408" key="GridCell.Tab.1.bottom" timestamp="1591305874663">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
-    <state width="2492" height="408" key="GridCell.Tab.1.bottom/0.0.3440.1400@0.0.3440.1400" timestamp="1591305217790" />
-    <state width="2492" height="408" key="GridCell.Tab.1.center" timestamp="1591305217790">
+    <state width="2492" height="408" key="GridCell.Tab.1.bottom/0.0.3440.1400@0.0.3440.1400" timestamp="1591305874663" />
+    <state width="2492" height="408" key="GridCell.Tab.1.center" timestamp="1591305874663">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
-    <state width="2492" height="408" key="GridCell.Tab.1.center/0.0.3440.1400@0.0.3440.1400" timestamp="1591305217790" />
-    <state width="2492" height="408" key="GridCell.Tab.1.left" timestamp="1591305217790">
+    <state width="2492" height="408" key="GridCell.Tab.1.center/0.0.3440.1400@0.0.3440.1400" timestamp="1591305874663" />
+    <state width="2492" height="408" key="GridCell.Tab.1.left" timestamp="1591305874663">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
-    <state width="2492" height="408" key="GridCell.Tab.1.left/0.0.3440.1400@0.0.3440.1400" timestamp="1591305217790" />
-    <state width="2492" height="408" key="GridCell.Tab.1.right" timestamp="1591305217790">
+    <state width="2492" height="408" key="GridCell.Tab.1.left/0.0.3440.1400@0.0.3440.1400" timestamp="1591305874663" />
+    <state width="2492" height="408" key="GridCell.Tab.1.right" timestamp="1591305874663">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
-    <state width="2492" height="408" key="GridCell.Tab.1.right/0.0.3440.1400@0.0.3440.1400" timestamp="1591305217790" />
+    <state width="2492" height="408" key="GridCell.Tab.1.right/0.0.3440.1400@0.0.3440.1400" timestamp="1591305874663" />
     <state x="1623" y="356" key="RollbackChangesDialog" timestamp="1590181160153">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
@@ -637,10 +645,10 @@
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
     <state x="779" y="190" width="2359" height="1097" key="VCS.FileHistoryDialog/0.0.3440.1400@0.0.3440.1400" timestamp="1590182372497" />
-    <state x="1577" y="434" key="Vcs.Push.Dialog.v2" timestamp="1591288006993">
+    <state x="1577" y="434" key="Vcs.Push.Dialog.v2" timestamp="1591305870105">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
-    <state x="1577" y="434" key="Vcs.Push.Dialog.v2/0.0.3440.1400@0.0.3440.1400" timestamp="1591288006993" />
+    <state x="1577" y="434" key="Vcs.Push.Dialog.v2/0.0.3440.1400@0.0.3440.1400" timestamp="1591305870105" />
     <state x="1434" y="390" key="VcsDiffUtil.ChangesDialog" timestamp="1590181346690">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
@@ -683,7 +691,7 @@
       <breakpoints>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/../../../Python_Project_common_package/FFT_Class.py</url>
-          <line>585</line>
+          <line>588</line>
           <option name="timeStamp" value="24" />
         </line-breakpoint>
       </breakpoints>
