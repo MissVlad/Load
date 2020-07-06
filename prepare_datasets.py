@@ -195,7 +195,7 @@ class NILMTorchDataset(TorchDataSet):
                 transform_args[i] = (np.nanmin(self.data[i].values), np.nanmax(self.data[i].values))
             return transform_args
 
-        return func
+        return func()
 
 
 class ScotlandDataset(metaclass=ABCMeta):

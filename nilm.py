@@ -80,6 +80,7 @@ def energies_paper_prepare_dataset_for_torch_model_for_ampds2_dataset(*, applian
                                            sequence_length=int((3600 * 24) / sample_period),  # 即：一天中的样本个数
                                            transform_args_file_path=transform_args_file_path,
                                            country=Canada()))
+        tt=1
     return tuple(torch_sets)
 
 
@@ -88,7 +89,9 @@ def energies_paper_train_torch_model_for_ampds2_dataset(*, appliance_original_na
                                                         sample_period: int,
                                                         model_save_path: Path) -> dict:
     training_time_path = model_save_path.parent / re.sub(r'_model', '_training_and_loss.pkl', model_save_path.stem)
-    if not try_to_find_file(model_save_path):
+    # TODO
+    if True:
+    # if not try_to_find_file(model_save_path):
         ############################################################
         epoch_num = 2700
         training_torch_set_dl_bs = 100
@@ -235,11 +238,11 @@ if __name__ == '__main__':
         for this_appliance in ('B1E', 'OFE', 'B2E', 'HPE'):
             if not((_sample_period == 60) and (this_appliance=='HPE')):
                 continue
-            # energies_paper_train_torch_model_for_ampds2_dataset(
-            #     appliance_original_name=this_appliance,
-            #     model_save_path=Path(project_path_) / f'Data/Results/Energies_paper/Ampds2/lstm/{this_appliance}/'
-            #                                           f'{this_appliance}_{_sample_period}_lstm_model.pkl',
-            #     sample_period=_sample_period)
+            energies_paper_train_torch_model_for_ampds2_dataset(
+                appliance_original_name=this_appliance,
+                model_save_path=Path(project_path_) / f'Data/Results/Energies_paper/Ampds2/lstm/{this_appliance}/'
+                                                      f'{this_appliance}_{_sample_period}_lstm_model.pkl',
+                sample_period=_sample_period)
             energies_paper_test_torch_model_for_ampds2_dataset(
                 appliance_original_name=this_appliance,
                 model_save_path=Path(project_path_) / f'Data/Results/Energies_paper/Ampds2/lstm/{this_appliance}/'
