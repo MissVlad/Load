@@ -1,30 +1,180 @@
-import nilmtk
+import copy
+import os
+from abc import ABCMeta, abstractmethod
+from pathlib import Path
+from typing import Tuple
+
+import pandas as pd
+import torch
 from nilmtk import DataSet, MeterGroup
 from nilmtk.dataset_converters.refit.convert_refit import convert_refit
-from nilmtk.utils import print_dict
-import os
+from scipy.io import loadmat
+from torch.utils.data import Dataset as TorchDataSet
+
+from File_Management.load_save_Func import load_exist_pkl_file_otherwise_run_and_save
 from File_Management.path_and_file_management_Func import try_to_find_file
-from File_Management.load_save_Func import load_exist_pkl_file_otherwise_run_and_save, load_pkl_file, save_pkl_file
-import pandas as pd
-import numpy as np
-from numpy import ndarray
-from Ploting.fast_plot_Func import series, hist, scatter, time_series
-import matplotlib.pyplot as plt
-import csv
-from dateutil import tz
-from typing import Tuple
-from FFT_Class import FFTProcessor
-import copy
-from torch.utils.data import Dataset as TorchDataSet, DataLoader as TorchDataLoader
-import torch
-from pathlib import Path
+from Ploting.fast_plot_Func import *
+from TimeSeries_Class import TimeSeries, UnivariateTimeSeries, merge_two_time_series_df
 from Time_Processing.datetime_utils import DatetimeOnehotEncoder
 from project_path_Var import project_path_
-from scipy.io import loadmat
-import datetime
-from abc import ABCMeta, abstractmethod
+import copy
+from Writting import docx_document_template_to_collect_figures
+from docx.shared import Cm, Pt
+from docx.enum.text import WD_BREAK
+from dateutil import tz
+from pandas import DataFrame
+from workalendar.america import Canada
+from Time_Processing.datetime_utils import DatetimeOnehotEncoder
+from pyorbital.moon_phase import moon_phase
 
 DATASET_ROOT_DIRECTORY = r'E:\OneDrive_Extra\Database\Load_Disaggregation'
+LOW_CARBON_LONDON_ROOT = r'C:\Users\SoapClancy\OneDrive\PhD\01-PhDProject\Database\UK Power Networks'
+
+
+def load_low_carbon_london_heat(this_no, df_name: str):
+    """
+    Depreciated codes. Only for very specific task. Do not be fooled.
+    """
+    # available_customer_no = (1, 2, 3, 4, 5, 7, 9)
+    heat_data_root = Path(
+        LOW_CARBON_LONDON_ROOT) / r'Low Carbon London Heat Pump Load Profiles\Data supply 1\Data supply 1\Heat Profiles'
+    pq_data_root = Path(
+        LOW_CARBON_LONDON_ROOT) / r'Low Carbon London Heat Pump Load Profiles\Data supply 1\Data supply 1\Power Quality'
+    figure_buffer_list = []
+    names_list = []
+
+    # for this_no in available_customer_no:
+    this_figure_buffer_list_elec = []
+    this_figure_buffer_list_heat = []
+    this_figure_buffer_list_elec_and_heat = []
+
+    # read heat pump
+    this_heat_df = pd.read_csv(heat_data_root / f'S1_Customer_L_{this_no}.csv',
+                               sep=',', index_col='timestamp')
+    this_heat_df = TimeSeries(
+        this_heat_df[['external_temperature', 'zone_1_temperature', 'heat_pump_energy_consumption']],
+        index=pd.DatetimeIndex(this_heat_df.index)
+    )
+    this_heat_df['heat_pump_energy_consumption'].iloc[1:] = np.diff(
+        this_heat_df['heat_pump_energy_consumption'].values
+    )
+    this_heat_df.rename({'heat_pump_energy_consumption': 'heat_pump_energy_consumption diff'}, axis=1, inplace=True)
+    this_heat_df = this_heat_df.iloc[1:]
+    # read electric
+    this_pq_df_index = pd.read_csv(pq_data_root / f'S1_Customer_PQ_{this_no}.csv', nrows=2, header=None)
+    this_pq_df_index = pd.date_range(start=pd.to_datetime(this_pq_df_index.iloc[0, 1], format="%d/%m/%Y %H:%M"),
+                                     end=pd.to_datetime(this_pq_df_index.iloc[1, 1], format="%d/%m/%Y %H:%M"),
+                                     freq='T')
+    this_pq_df = pd.read_csv(pq_data_root / f'S1_Customer_PQ_{this_no}.csv',
+                             sep=',', skiprows=5,
+                             engine='python', usecols=['kW of Vln * Il - Mean [kW]'])
+    # Apply Sasa's method. He said to take the absolute values for negative power, despite they may take 100 %
+    this_pq_df[this_pq_df < 0] = np.abs(this_pq_df[this_pq_df < 0])
+    try:
+        this_pq_df.index = this_pq_df_index
+        this_pq_df_aggregate = this_pq_df.resample('30T').mean()
+    except ValueError:
+        names_list.append(' ')
+        figure_buffer_list.append([])
+        return
+
+    # Try align heating and elec
+    this_pq_df_and_heat_df = merge_two_time_series_df(this_pq_df,
+                                                      this_heat_df,
+                                                      interpolate_method='nearest')
+    this_pq_df_and_heat_df = this_pq_df_and_heat_df.resample('30T').mean()
+
+    # %% Plot electric all
+    def plot_for_original_elec(x, y):
+        return time_series(x=x, y=y, color='b',
+                           x_label='Date time (original, resolution: 1 minute)', y_label='Active power [kW]',
+                           save_to_buffer=True)
+
+    def plot_for_aggregate_elec(x, y):
+        return time_series(x=x, y=y, color='b',
+                           x_label='Date time (aggregated, resolution: 30 minute)', y_label='Active power [kW]',
+                           save_to_buffer=True)
+
+    def plot_for_heat(x, y):
+        return time_series(x=x, y=y, color='r', linestyle='--',
+                           x_label='Date time (original, resolution: 30 minute)',
+                           y_label='heat_pump_energy_consumption\n'
+                                   'difference [unknown unit]',
+                           save_to_buffer=True)
+
+    def plot_for_aggregate_elec_and_heat(x_elec, y_elec, x_heat, y_heat):
+        buffer_1 = plot_for_aggregate_elec(x_elec, y_elec)
+        buffer_2 = plot_for_heat(x_heat, y_heat)
+        return buffer_1, buffer_2
+
+    this_figure_buffer_list_elec.append(plot_for_original_elec(this_pq_df.index, this_pq_df.iloc[:, 0].values))
+    this_figure_buffer_list_elec.append(
+        plot_for_aggregate_elec(this_pq_df_aggregate.index, this_pq_df_aggregate.iloc[:, 0].values)
+    )
+
+    this_figure_buffer_list_heat.append(plot_for_heat(this_heat_df.index, this_heat_df.iloc[:, 0].values))
+
+    this_figure_buffer_list_elec_and_heat.extend(plot_for_aggregate_elec_and_heat(
+        x_elec=this_pq_df_and_heat_df.index,
+        y_elec=this_pq_df_and_heat_df.iloc[:, 0],
+        x_heat=this_pq_df_and_heat_df.index,
+        y_heat=this_pq_df_and_heat_df.iloc[:, -1]
+    ))
+    iter_dict = {'electric': this_pq_df,
+                 'heat': this_heat_df,
+                 'electric and heat': this_pq_df_and_heat_df}
+    considered_df = iter_dict[df_name]
+    figure_buffer_list_specific = copy.deepcopy(figure_buffer_list)
+    this_figure_buffer_list_elec_specific = copy.deepcopy(this_figure_buffer_list_elec)
+    date_range = pd.date_range(considered_df.first_valid_index().date(),
+                               considered_df.last_valid_index().date(),
+                               freq='D')
+    for i in range(date_range.__len__()):
+        if i == date_range.__len__() - 1:
+            if considered_df.loc[date_range[i]:].size < 40:
+                break
+            this_df_i = considered_df.loc[date_range[i]:]
+            if df_name == 'electric':
+                this_pq_df_aggregate_i = this_pq_df_aggregate.loc[date_range[i]:]
+
+        else:
+            this_df_i = considered_df.loc[date_range[i]:date_range[i + 1]].iloc[:-1]
+            if df_name == 'electric':
+                this_pq_df_aggregate_i = this_pq_df_aggregate.loc[date_range[i]:date_range[i + 1]].iloc[:-1]
+        if df_name == 'electric':
+            this_figure_buffer_list_elec_specific.append(
+                plot_for_original_elec(this_df_i.index, this_df_i.iloc[:, 0].values))
+            this_figure_buffer_list_elec_specific.append(
+                plot_for_aggregate_elec(this_pq_df_aggregate_i.index, this_pq_df_aggregate_i.iloc[:, 0].values)
+            )
+            figure_buffer_list_specific.append(this_figure_buffer_list_elec_specific)
+
+        elif df_name == 'heat':
+            this_figure_buffer_list_heat.append(
+                plot_for_heat(this_df_i.index, this_df_i.iloc[:, 0].values))
+            figure_buffer_list_specific.append(this_figure_buffer_list_heat)
+
+        else:
+            this_figure_buffer_list_elec_and_heat.extend(
+                plot_for_aggregate_elec_and_heat(this_df_i.index, this_df_i.iloc[:, 0].values,
+                                                 this_df_i.index, this_df_i.iloc[:, -1].values)
+            )
+            figure_buffer_list_specific.append(this_figure_buffer_list_elec_and_heat)
+
+    names_list.append(f'S1_Customer_L_{this_no}.csv')
+    # Write
+    document = docx_document_template_to_collect_figures()
+    for i in range(names_list.__len__()):
+        document.add_heading(names_list[i], level=1)
+        p = document.add_paragraph()
+        p.add_run().add_break()
+        for j in range(figure_buffer_list_specific[i].__len__()):
+            p = document.add_paragraph()
+            p.add_run().add_picture(figure_buffer_list_specific[i][j], width=Cm(14))
+            # if (j % 2) == 1:
+            #     p.add_run().add_break()
+        document.add_page_break()
+    document.save(f'.\\London {df_name} data household_{this_no}.docx')
 
 
 def load_ampds2_weather():
@@ -33,25 +183,33 @@ def load_ampds2_weather():
     :return:
     """
     _path = os.path.join(DATASET_ROOT_DIRECTORY,
-                         r'AMPds2/MERRA2/')
-    if not os.path.exists(_path + "weather.pkl"):
-        read_results = pd.DataFrame()
-        for file in ('2012.csv', '2013.csv', '2014.csv'):
-            reading = pd.read_csv(_path + file,
-                                  sep=',',
-                                  skiprows=3)
-            read_results = pd.concat((read_results,
-                                      pd.DataFrame(index=pd.DatetimeIndex(reading['local_time']),
-                                                   data={'temperature': reading['temperature'].values,
-                                                         'solar irradiation': reading['radiation_surface'].values,
-                                                         'precipitation': reading['precipitation'].values,
-                                                         'air density': reading['air_density'].values})
-                                      ))
-        read_results = read_results.loc[~read_results.index.duplicated()]
-        read_results.to_pickle(_path + "weather.pkl")
-    else:
-        read_results = pd.read_pickle(_path + "weather.pkl")  # type: pd.DataFrame
-
+                         r'AMPds2/dataverse_files/Climate_HourlyWeather.csv')
+    reading = pd.read_csv(_path,
+                          sep=',')
+    read_results = reading[['Temp (C)', 'Rel Hum (%)', 'Stn Press (kPa)']]
+    read_results.index = pd.DatetimeIndex(pd.to_datetime(reading.iloc[:, 0],
+                                                         format='%Y-%m-%d %H:%M'))
+    # _path = os.path.join(DATASET_ROOT_DIRECTORY,
+    #                      r'AMPds2/MERRA2/')
+    # # America / Vancouver
+    # if not os.path.exists(_path + "weather.pkl"):
+    #     read_results = pd.DataFrame()
+    #     for file in ('2012.csv', '2013.csv', '2014.csv'):
+    #         reading = pd.read_csv(_path + file,
+    #                               sep=',',
+    #                               skiprows=3)
+    #         read_results = pd.concat((read_results,
+    #                                   pd.DataFrame(index=pd.DatetimeIndex(reading['local_time']),
+    #                                                data={'temperature': reading['temperature'].values,
+    #                                                      'solar irradiation': reading['radiation_surface'].values,
+    #                                                      'precipitation': reading['precipitation'].values,
+    #                                                      'air density': reading['air_density'].values})
+    #                                   ))
+    #     read_results = read_results.loc[~read_results.index.duplicated()]
+    #     read_results.to_pickle(_path + "weather.pkl")
+    # else:
+    #     read_results = pd.read_pickle(_path + "weather.pkl")  # type: pd.DataFrame
+    #
     return read_results
 
 
@@ -86,7 +244,7 @@ def load_datasets():
     return _ampds2_dataset, _refit_dataset, _uk_dale_dataset
 
 
-def get_training_set_and_test_set_for_ampds2_dataset() -> Tuple[MeterGroup, MeterGroup]:
+def get_training_set_and_test_set_for_ampds2_dataset() -> Tuple[MeterGroup, MeterGroup, MeterGroup]:
     """
     从ampds2_dataset中分离出training set和test set，
     只考虑building 1
@@ -96,11 +254,52 @@ def get_training_set_and_test_set_for_ampds2_dataset() -> Tuple[MeterGroup, Mete
     """
     training_set, _, _ = load_datasets()
     test_set, _, _ = load_datasets()
+    whole_set, _, _ = load_datasets()
+
     training_set.set_window(end='2013-4-1')
     training_set = training_set.buildings[1].elec
+
     test_set.set_window(start='2013-4-1')
     test_set = test_set.buildings[1].elec
-    return training_set, test_set
+
+    whole_set = whole_set.buildings[1].elec
+    return training_set, test_set, whole_set
+
+
+def ampds2_dataset_full_df(resolution: int) -> pd.DataFrame:
+    """
+    ampds2_dataset的heat，main，和对应的气象，和对应的时间
+    """
+    _, _, ampds2 = get_training_set_and_test_set_for_ampds2_dataset()
+    heating_df = next(ampds2.select_using_appliances(
+        original_name='HPE').meters[0].load(ac_type='active', sample_period=resolution))
+    heating_df = heating_df.droplevel('physical_quantity', axis=1)  # type: DataFrame
+    heating_df.rename(columns={'active': 'HPE'}, inplace=True)
+
+    mains_df = next(ampds2.mains().load(
+        ac_type='active', sample_period=resolution)).droplevel('physical_quantity', axis=1)  # type: DataFrame
+    mains_df.rename(columns={mains_df.columns[0]: 'Mains'}, inplace=True)
+
+    ampds2_weather_df = load_ampds2_weather()
+    mains_weather_df_merged = merge_two_time_series_df(mains_df, ampds2_weather_df)
+    mains_weather_df_merged = mains_weather_df_merged.reindex(columns=mains_weather_df_merged.columns[1:].append(
+        mains_weather_df_merged.columns[slice(1)]))
+
+    full_data_df = pd.concat((mains_weather_df_merged, heating_df), axis=1)
+
+    full_data_df['year'] = full_data_df.index.year
+    full_data_df['month'] = full_data_df.index.month
+    full_data_df['day'] = full_data_df.index.day
+    full_data_df['dayofweek'] = full_data_df.index.dayofweek + 1
+    full_data_df['hour'] = full_data_df.index.hour
+    full_data_df['minute'] = full_data_df.index.minute
+    full_data_df['moon_phase'] = moon_phase(full_data_df.index.to_numpy())
+    date_time_one_hot_encoder = DatetimeOnehotEncoder(to_encoding_args=('holiday', 'summer_time'))
+    time_var_transformed = date_time_one_hot_encoder(full_data_df.index,
+                                                     country=Canada())
+    full_data_df['holiday'] = np.array(time_var_transformed.iloc[:, 0] == 0, dtype=int)
+    full_data_df['summer_time'] = np.array(time_var_transformed.iloc[:, 2] == 1, dtype=int)
+    return full_data_df
 
 
 class NILMTorchDataset(TorchDataSet):
@@ -122,7 +321,7 @@ class NILMTorchDataset(TorchDataSet):
         .
         .
         .
-        TODO: solar/moon
+        TODO: solar
         transform_args: 形如下面的一个pd.DataFrame
                   temperature  solar irradiation   precipitation   air density   mains_var   appliance_var
 
@@ -153,13 +352,17 @@ class NILMTorchDataset(TorchDataSet):
         data_y = self.transformed_data[1][index_slice]  # type: torch.tensor
         return data_x, data_y
 
-    def _transform(self, transform_args_file_path) -> Tuple[torch.tensor, torch.tensor]:
+    def _transform(self, transform_args_file_path, mode='NILM') -> Tuple[torch.tensor, torch.tensor]:
         # 时间变量
+        # datetime_onehot_encoder = DatetimeOnehotEncoder(to_encoding_args=('month',
+        #                                                                   'weekday',
+        #                                                                   'holiday',
+        #                                                                   'hour',
+        #                                                                   'minute'))
         datetime_onehot_encoder = DatetimeOnehotEncoder(to_encoding_args=('month',
                                                                           'weekday',
                                                                           'holiday',
-                                                                          'hour',
-                                                                          'minute'))
+                                                                          'summer_time'))
         time_var_transformed = datetime_onehot_encoder(self.data.index,
                                                        country=self.country)
         # 其它
@@ -175,9 +378,16 @@ class NILMTorchDataset(TorchDataSet):
         data_x = torch.tensor(transformed_x_y.iloc[:, :-1].values,
                               device='cuda:0',
                               dtype=torch.float)
-        data_y = torch.tensor(transformed_x_y.iloc[:, [-1]].values,
-                              device='cuda:0',
-                              dtype=torch.float)
+        if mode == 'NILM':
+            data_y = torch.tensor(transformed_x_y.iloc[:, [-1]].values,
+                                  device='cuda:0',
+                                  dtype=torch.float)
+        elif mode == 'forecast':
+            data_y = torch.tensor(transformed_x_y.iloc[:, -2:].values,
+                                  device='cuda:0',
+                                  dtype=torch.float)
+        else:
+            raise Exception
         return data_x, data_y
 
     def _get_transform_args(self, file_path: Path) -> pd.DataFrame:
@@ -198,8 +408,31 @@ class NILMTorchDataset(TorchDataSet):
         return func()
 
 
+class NILMTorchDatasetForecast(NILMTorchDataset):
+
+    def __len__(self):
+        if self.over_lapping:
+            raise NotImplementedError
+        else:
+            return int(self.data.__len__() / self.sequence_length) - 1
+
+    def __getitem__(self, index: int):
+        # 决定索引的位置
+        if self.over_lapping:
+            raise NotImplementedError
+        else:
+            index_slice_x = slice(index * self.sequence_length, (index + 1) * self.sequence_length)
+            index_slice_y = slice((index + 1) * self.sequence_length, (index + 2) * self.sequence_length)
+        data_x = self.transformed_data[0][index_slice_x]  # type: torch.tensor
+        data_y = self.transformed_data[1][index_slice_y]  # type: torch.tensor
+        return data_x, data_y
+
+    def _transform(self, transform_args_file_path, mode='forecast') -> Tuple[torch.tensor, torch.tensor]:
+        return super(NILMTorchDatasetForecast, self)._transform(transform_args_file_path, mode='forecast')
+
+
 class ScotlandDataset(metaclass=ABCMeta):
-    data_path_root = Path(project_path_) / r'Data\Raw\Scotland selected'
+    data_path_root = project_path_ / r'Data\Raw\Scotland selected'
     __slots__ = ('name', 'matlab_mat_file_folder', 'dataset')
 
     def __init__(self, name: str):
@@ -335,7 +568,11 @@ class ScotlandShorterDataset(ScotlandDataset):
 
 
 if __name__ == '__main__':
-    ampds2_dataset, refit_dataset, uk_dale_dataset = load_datasets()
-    get_training_set_and_test_set_for_ampds2_dataset()
+    # ampds2_dataset, refit_dataset, uk_dale_dataset = load_datasets()
+    # get_training_set_and_test_set_for_ampds2_dataset()
     # John_data = ScotlandLongerDataset('John')
     # John_data.set_weekends_and_holiday_to_zeros()
+    for _this_no in (1, 2, 3, 4, 5, 7):
+        for this_type in ('electric', 'heat', 'electric and heat'):
+            load_low_carbon_london_heat(_this_no, this_type)
+    # load_ampds2_weather()
