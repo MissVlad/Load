@@ -1,4 +1,5 @@
-from Regression_Analysis.DeepLearning_Class import StackedBiLSTM
+from Regression_Analysis.DeepLearning_Class import StackedBiLSTM, LSTMEncoderDecoderWrapper, LSTMEncoder, \
+    LSTMCellDecoder
 import pandas as pd
 from pandas import DataFrame
 from Ploting.fast_plot_Func import *
@@ -19,6 +20,15 @@ import time
 import re
 from Writting.utils import put_cached_png_into_a_docx
 from typing import List
+import os
+import copy
+
+os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':16:8'
+# os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+
+torch.backends.cudnn.enabled = False
+# torch.backends.cudnn.benchmark = True
+# torch.cuda.set_device(0)
 
 
 def energies_paper_prepare_dataset_for_torch_model_for_ampds2_dataset(*, appliance_original_name: List[str] = None,
@@ -84,11 +94,32 @@ def energies_paper_prepare_dataset_for_torch_model_for_ampds2_dataset(*, applian
         # 生成TorchDataset对象
         # 注意transform_args.pkl的命名方式，这样让training set和test set共用一组参数，只与用电器有关,
         # 由training set决定，因为loop中它在先
+        # tt.__len__()
+        # tt[0]
+        # func = lambda x: x.cpu().numpy()
+        # x1, y1 = tt[0]
+        # x2, y2 = tt[1]
+        # x7, y7 = tt[6]
+        # x8, y8 = tt[7]
+        #
+        # x1 = func(x1)
+        # y1 = func(y1)
+        #
+        # x2 = func(x2)
+        # y2 = func(y2)
+        #
+        # x7 = func(x7)
+        # y7 = func(y7)
+        #
+        # x8 = func(x8)
+        # y8 = func(y8)
+
         torch_sets.append(NILMTorchDatasetForecast(data,
                                                    # 即：一天中的样本个数
                                                    sequence_length=int((3600 * 24) / sample_period),
                                                    transform_args_file_path=transform_args_file_path,
-                                                   country=Canada()))
+                                                   country=Canada(),
+                                                   over_lapping=3))
     return tuple(torch_sets)
 
 
@@ -102,9 +133,10 @@ def energies_paper_train_torch_model_for_ampds2_dataset(*, appliance_original_na
     if True:
         # if not try_to_find_file(model_save_path):
         ############################################################
-        epoch_num = 3000
-        training_torch_set_dl_bs = 50
-        hidden_size = 512
+        epoch_num = 35
+        training_torch_set_dl_bs = 13
+
+        hidden_size = 256
         learning_rate = 1e-4
         weight_decay = 0.00001
         dropout = 0.1
@@ -119,10 +151,43 @@ def energies_paper_train_torch_model_for_ampds2_dataset(*, appliance_original_na
                                            batch_size=training_torch_set_dl_bs,
                                            shuffle=False)
         # %% 定义模型
-        simple_lstm_model = StackedBiLSTM(input_size=training_torch_set[0][0].size()[-1],
-                                          hidden_size=hidden_size,
-                                          output_size=training_torch_set[0][1].size()[-1],
-                                          dropout=dropout)
+        input_feature_len = training_torch_set[0][0].size()[-1]
+        input_sequence_len = training_torch_set[0][0].size()[-2]
+
+        output_feature_len = training_torch_set[0][1].size()[-1]
+        output_sequence_len = training_torch_set[0][1].size()[-2]
+
+        lstm_encoder = LSTMEncoder(
+            lstm_num_layers=2,
+            input_feature_len=input_feature_len,
+            sequence_len=input_sequence_len,
+            output_feature_len=output_feature_len,
+            hidden_size=hidden_size,
+            bidirectional=True,
+            dropout=dropout
+        )
+        lstm_encoder.train()
+
+        lstm_decoder_cell = LSTMCellDecoder(
+            output_feature_len=output_feature_len,
+            hidden_size=hidden_size,
+            dropout=dropout
+        )
+        lstm_decoder_cell.train()
+
+        simple_lstm_model = LSTMEncoderDecoderWrapper(
+            lstm_encoder=lstm_encoder,
+            lstm_decoder_cell=lstm_decoder_cell,
+            output_sequence_len=output_sequence_len,
+            output_feature_len=output_feature_len
+        )
+        simple_lstm_model.train()
+        # simple_lstm_model = StackedBiLSTM(input_size=training_torch_set[0][0].size()[-1],
+        #                                   hidden_size=hidden_size,
+        #                                   output_size=training_torch_set[0][1].size()[-1],
+        #                                   dropout=dropout,
+        #                                   sequence_len=training_torch_set[0][0].size()[-2])
+
         # simple_lstm_model = torch.nn.DataParallel(simple_lstm_model, device_ids=[0]).cuda()  # 将模型转为cuda类型
         # %% 定义优化器
         opt = torch.optim.Adam(simple_lstm_model.parameters(),
@@ -137,13 +202,15 @@ def energies_paper_train_torch_model_for_ampds2_dataset(*, appliance_original_na
             simple_lstm_model.train()
             batch_loss = []
             for index, (xb, yb) in enumerate(training_torch_set_dl):
-                pred = simple_lstm_model(xb)
+                # pred = simple_lstm_model(xb, yb)
+                pred = simple_lstm_model(xb, yb)
                 loss = loss_func(pred, yb).cuda()
+                opt.zero_grad()
                 loss.backward()
                 opt.step()
-                opt.zero_grad()
-                batch_loss.append(loss)
+                batch_loss.append(loss.item())
                 print(f"第{i + 1: d}个epoch, 第{index + 1: d}个batch, loss={loss}")
+            print(f"第{i + 1: d}个epoch结束, 平均loss={np.mean(batch_loss)}")
             epoch_loss.append(batch_loss)
         # 保存整个模型
         torch.save(simple_lstm_model, model_save_path)
@@ -179,7 +246,7 @@ def energies_paper_test_torch_model_for_ampds2_dataset(*, appliance_original_nam
         ax = series(test_torch_set.data.index[
                     index * test_torch_set.sequence_length:(index + 1) * test_torch_set.sequence_length
                     ].to_pydatetime(),
-                    pred[0,:,0].detach().cpu().numpy().flatten(), label='LSTM', figure_size=(10, 2.4))
+                    pred[0, :, 0].detach().cpu().numpy().flatten(), label='LSTM', figure_size=(10, 2.4))
         x_plot = test_torch_set.data.index[
                  index * test_torch_set.sequence_length:(index + 1) * test_torch_set.sequence_length].to_pydatetime()
         buf = series(
@@ -265,6 +332,7 @@ if __name__ == '__main__':
 
     # energies_paper_prepare_dataset_for_torch_model_for_ampds2_dataset(appliance_original_name=['HPE'],
     #                                                                   sample_period=1800)
+
     _sample_period = 60
     energies_paper_train_torch_model_for_ampds2_dataset(
         appliance_original_name='HPE',

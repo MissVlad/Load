@@ -26,16 +26,12 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="43c57110-725f-4a7b-90b7-cc09d5a22551" name="Default Changelist" comment="regular updates">
-      <change afterPath="$PROJECT_DIR$/project_Dependance.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/papers/Energies_Research_paper_2020.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/papers/__init__.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/nilm.py" beforeDir="false" afterPath="$PROJECT_DIR$/nilm.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/prepare_datasets.py" beforeDir="false" afterPath="$PROJECT_DIR$/prepare_datasets.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/project_path_Var.py" beforeDir="false" afterPath="$PROJECT_DIR$/project_path_Var.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../../../Python_Project_common_package/Ploting/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/../../../Python_Project_common_package/Ploting/__init__.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../../../Python_Project_common_package/Ploting/fast_plot_Func.py" beforeDir="false" afterPath="$PROJECT_DIR$/../../../Python_Project_common_package/Ploting/fast_plot_Func.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../../../Python_Project_common_package/Ploting/utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/../../../Python_Project_common_package/Ploting/utils.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../../../Python_Project_common_package/TimeSeries_Class.py" beforeDir="false" afterPath="$PROJECT_DIR$/../../../Python_Project_common_package/TimeSeries_Class.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../../../Python_Project_common_package/Time_Processing/datetime_utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/../../../Python_Project_common_package/Time_Processing/datetime_utils.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../../Python_Project_common_package/Regression_Analysis/DeepLearning_Class.py" beforeDir="false" afterPath="$PROJECT_DIR$/../../../Python_Project_common_package/Regression_Analysis/DeepLearning_Class.py" afterDir="false" />
     </list>
     <list id="a096d756-1ac3-4293-a23d-21926fc15656" name="1) flexible windowed class and __iter__, suitable for STFT, considering various window types; 2) adjust_Func.py updated for convenient adjust AxesSubplot; 3) full manual STFT results, NB: rectangle window is the best; 4) scipy.signal.find_peaks must be added to FFTProcessor class" comment="" />
     <option name="SHOW_DIALOG" value="false" />
@@ -51,7 +47,7 @@
     </option>
   </component>
   <component name="Git.Settings">
-    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/../../../Python_Project_common_package" />
     <option name="ROOT_SYNC" value="SYNC" />
   </component>
   <component name="GithubPullRequestsUISettings">
@@ -171,6 +167,9 @@
       <module name="Code" />
       <option name="INTERPRETER_OPTIONS" value="" />
       <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
       <option name="SDK_HOME" value="" />
       <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
       <option name="IS_MODULE_SDK" value="true" />
@@ -383,7 +382,21 @@
       <workItem from="1595422385286" duration="1175000" />
       <workItem from="1595424083954" duration="6598000" />
       <workItem from="1595439505950" duration="976000" />
-      <workItem from="1595453184148" duration="8952000" />
+      <workItem from="1595453184148" duration="105164000" />
+      <workItem from="1595600692246" duration="3017000" />
+      <workItem from="1595626524504" duration="282000" />
+      <workItem from="1595626928040" duration="702000" />
+      <workItem from="1595627650969" duration="535000" />
+      <workItem from="1595628339885" duration="223000" />
+      <workItem from="1595628575812" duration="406000" />
+      <workItem from="1595629080790" duration="167000" />
+      <workItem from="1595629490221" duration="743000" />
+      <workItem from="1595631149643" duration="383000" />
+      <workItem from="1595632107234" duration="2096000" />
+      <workItem from="1595634513883" duration="1128000" />
+      <workItem from="1595635773410" duration="832000" />
+      <workItem from="1595636621493" duration="1124000" />
+      <workItem from="1595664348291" duration="133000" />
     </task>
     <task id="LOCAL-00001" summary="n/a">
       <created>1588669410795</created>
@@ -567,7 +580,14 @@
       <option name="project" value="LOCAL" />
       <updated>1594027681243</updated>
     </task>
-    <option name="localTasksCounter" value="27" />
+    <task id="LOCAL-00027" summary="regular updates">
+      <created>1595492443011</created>
+      <option name="number" value="00027" />
+      <option name="presentableId" value="LOCAL-00027" />
+      <option name="project" value="LOCAL" />
+      <updated>1595492443011</updated>
+    </task>
+    <option name="localTasksCounter" value="28" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -610,27 +630,23 @@
     <MESSAGE value="LASSOFFT Class" />
     <MESSAGE value="LASSOFFTProcessor ready,&#10;SCFormFourierSeriesProcessor ready" />
     <MESSAGE value="Improve BivariateFFTCorrelation efficiency and logics. Also, allow to supply extra frequencies for 'corr_between_main_and_combined_selected_vice_peaks_f_ifft' method of BivariateFFTCorrelation instance" />
-    <MESSAGE value="regular updates" />
     <MESSAGE value="1) Done with 'corr_between_main_and_combined_selected_vice_peaks_f_ifft' method in BivariateFFTCorrelation instance object.&#10;&#10;2) Add selector to SCFormFourierSeriesProcessor instance object." />
     <MESSAGE value="BayesianFFT abstract has been added. It has been successfully tested in scratch.py. And it will be fully implemented tomorrow. New age begins!" />
     <MESSAGE value="New age! First Bayesian model has been implemented! Bayesian LASSO FFT is now available. Next step should be improve the performance of MCMC" />
     <MESSAGE value="TODO记录。下次必须修正" />
     <MESSAGE value="add README.md" />
-    <option name="LAST_COMMIT_MESSAGE" value="add README.md" />
+    <MESSAGE value="regular updates" />
+    <option name="LAST_COMMIT_MESSAGE" value="regular updates" />
   </component>
   <component name="WindowStateProjectService">
-    <state x="1807" y="350" key="#Menus_and_Toolbars" timestamp="1586985609231">
-      <screen x="0" y="0" width="3440" height="1400" />
-    </state>
-    <state x="1807" y="350" key="#Menus_and_Toolbars/0.0.3440.1400@0.0.3440.1400" timestamp="1586985609231" />
     <state x="487" y="438" width="1429" height="634" key="#Notifications" timestamp="1591093165997">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
     <state x="487" y="438" width="1429" height="634" key="#Notifications/0.0.3440.1400@0.0.3440.1400" timestamp="1591093165997" />
-    <state x="1018" y="265" width="1412" height="756" key="#com.intellij.execution.impl.EditConfigurationsDialog" timestamp="1591134513457">
+    <state x="1018" y="265" width="1412" height="756" key="#com.intellij.execution.impl.EditConfigurationsDialog" timestamp="1595635645679">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
-    <state x="1018" y="265" width="1412" height="756" key="#com.intellij.execution.impl.EditConfigurationsDialog/0.0.3440.1400@0.0.3440.1400" timestamp="1591134513457" />
+    <state x="1018" y="265" width="1412" height="756" key="#com.intellij.execution.impl.EditConfigurationsDialog/0.0.3440.1400@0.0.3440.1400" timestamp="1595635645679" />
     <state x="1769" y="450" key="#com.intellij.ide.util.MemberChooser" timestamp="1590420595583">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
@@ -659,10 +675,10 @@
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
     <state x="1344" y="381" key="#xdebugger.XInspectDialog/0.0.3440.1400@0.0.3440.1400" timestamp="1591284397320" />
-    <state x="168" y="112" width="1202" height="794" key="#xdebugger.evaluate" timestamp="1595492343564">
+    <state x="426" y="654" width="1020" height="677" key="#xdebugger.evaluate" timestamp="1595635084302">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
-    <state x="168" y="112" width="1202" height="794" key="#xdebugger.evaluate/0.0.3440.1400@0.0.3440.1400" timestamp="1595492343564" />
+    <state x="426" y="654" width="1020" height="677" key="#xdebugger.evaluate/0.0.3440.1400@0.0.3440.1400" timestamp="1595635084302" />
     <state x="1761" y="602" key="ANALYSIS_DLG_com.intellij.analysis.BaseAnalysisAction$1" timestamp="1588681133106">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
@@ -671,14 +687,14 @@
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
     <state x="1446" y="184" width="1756" height="1033" key="CommitChangelistDialog2/0.0.3440.1400@0.0.3440.1400" timestamp="1590181042857" />
-    <state width="2093" height="646" key="DebuggerActiveHint" timestamp="1595492125374">
+    <state width="2093" height="646" key="DebuggerActiveHint" timestamp="1595626310860">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
-    <state width="2093" height="646" key="DebuggerActiveHint/0.0.3440.1400@0.0.3440.1400" timestamp="1595492125374" />
-    <state x="582" y="169" width="2384" height="1023" key="DiffContextDialog" timestamp="1590482323776">
+    <state width="2093" height="646" key="DebuggerActiveHint/0.0.3440.1400@0.0.3440.1400" timestamp="1595626310860" />
+    <state x="582" y="169" width="2384" height="1023" key="DiffContextDialog" timestamp="1595636079491">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
-    <state x="582" y="169" width="2384" height="1023" key="DiffContextDialog/0.0.3440.1400@0.0.3440.1400" timestamp="1590482323776" />
+    <state x="582" y="169" width="2384" height="1023" key="DiffContextDialog/0.0.3440.1400@0.0.3440.1400" timestamp="1595636079491" />
     <state x="1804" y="478" key="FileChooserDialogImpl" timestamp="1592410891528">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
@@ -687,46 +703,46 @@
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
     <state x="1786" y="631" key="GitRewordDialog/0.0.3440.1400@0.0.3440.1400" timestamp="1590181358477" />
-    <state width="2438" height="365" key="GridCell.Tab.0.bottom" timestamp="1595492020122">
+    <state width="2472" height="336" key="GridCell.Tab.0.bottom" timestamp="1595635647681">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
-    <state width="2438" height="365" key="GridCell.Tab.0.bottom/0.0.3440.1400@0.0.3440.1400" timestamp="1595492020122" />
-    <state width="2438" height="365" key="GridCell.Tab.0.center" timestamp="1595492020122">
+    <state width="2472" height="336" key="GridCell.Tab.0.bottom/0.0.3440.1400@0.0.3440.1400" timestamp="1595635647681" />
+    <state width="2472" height="336" key="GridCell.Tab.0.center" timestamp="1595635647681">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
-    <state width="2438" height="365" key="GridCell.Tab.0.center/0.0.3440.1400@0.0.3440.1400" timestamp="1595492020122" />
-    <state width="2438" height="365" key="GridCell.Tab.0.left" timestamp="1595492020121">
+    <state width="2472" height="336" key="GridCell.Tab.0.center/0.0.3440.1400@0.0.3440.1400" timestamp="1595635647681" />
+    <state width="2472" height="336" key="GridCell.Tab.0.left" timestamp="1595635647681">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
-    <state width="2438" height="365" key="GridCell.Tab.0.left/0.0.3440.1400@0.0.3440.1400" timestamp="1595492020121" />
-    <state width="2438" height="365" key="GridCell.Tab.0.right" timestamp="1595492020122">
+    <state width="2472" height="336" key="GridCell.Tab.0.left/0.0.3440.1400@0.0.3440.1400" timestamp="1595635647681" />
+    <state width="2472" height="336" key="GridCell.Tab.0.right" timestamp="1595635647681">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
-    <state width="2438" height="365" key="GridCell.Tab.0.right/0.0.3440.1400@0.0.3440.1400" timestamp="1595492020122" />
-    <state width="2438" height="365" key="GridCell.Tab.1.bottom" timestamp="1595492063670">
+    <state width="2472" height="336" key="GridCell.Tab.0.right/0.0.3440.1400@0.0.3440.1400" timestamp="1595635647681" />
+    <state width="2472" height="338" key="GridCell.Tab.1.bottom" timestamp="1595635647678">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
-    <state width="2438" height="365" key="GridCell.Tab.1.bottom/0.0.3440.1400@0.0.3440.1400" timestamp="1595492063670" />
-    <state width="2438" height="365" key="GridCell.Tab.1.center" timestamp="1595492063669">
+    <state width="2472" height="338" key="GridCell.Tab.1.bottom/0.0.3440.1400@0.0.3440.1400" timestamp="1595635647678" />
+    <state width="2472" height="338" key="GridCell.Tab.1.center" timestamp="1595635647678">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
-    <state width="2438" height="365" key="GridCell.Tab.1.center/0.0.3440.1400@0.0.3440.1400" timestamp="1595492063669" />
-    <state width="2438" height="365" key="GridCell.Tab.1.left" timestamp="1595492063669">
+    <state width="2472" height="338" key="GridCell.Tab.1.center/0.0.3440.1400@0.0.3440.1400" timestamp="1595635647678" />
+    <state width="2472" height="338" key="GridCell.Tab.1.left" timestamp="1595635647678">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
-    <state width="2438" height="365" key="GridCell.Tab.1.left/0.0.3440.1400@0.0.3440.1400" timestamp="1595492063669" />
-    <state width="2438" height="365" key="GridCell.Tab.1.right" timestamp="1595492063669">
+    <state width="2472" height="338" key="GridCell.Tab.1.left/0.0.3440.1400@0.0.3440.1400" timestamp="1595635647678" />
+    <state width="2472" height="338" key="GridCell.Tab.1.right" timestamp="1595635647678">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
-    <state width="2438" height="365" key="GridCell.Tab.1.right/0.0.3440.1400@0.0.3440.1400" timestamp="1595492063669" />
+    <state width="2472" height="338" key="GridCell.Tab.1.right/0.0.3440.1400@0.0.3440.1400" timestamp="1595635647678" />
     <state x="1623" y="356" key="RollbackChangesDialog" timestamp="1590181160153">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
     <state x="1623" y="356" key="RollbackChangesDialog/0.0.3440.1400@0.0.3440.1400" timestamp="1590181160153" />
-    <state x="1151" y="484" key="SettingsEditor" timestamp="1591110077024">
+    <state x="1151" y="484" key="SettingsEditor" timestamp="1595632726980">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
-    <state x="1151" y="484" key="SettingsEditor/0.0.3440.1400@0.0.3440.1400" timestamp="1591110077024" />
+    <state x="1151" y="484" key="SettingsEditor/0.0.3440.1400@0.0.3440.1400" timestamp="1595632726980" />
     <state x="1805" y="646" width="701" height="359" key="VCS.ChangelistChooser" timestamp="1590181450222">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
@@ -735,10 +751,10 @@
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
     <state x="779" y="190" width="2359" height="1097" key="VCS.FileHistoryDialog/0.0.3440.1400@0.0.3440.1400" timestamp="1590182372497" />
-    <state x="1577" y="434" key="Vcs.Push.Dialog.v2" timestamp="1594027686781">
+    <state x="1577" y="434" key="Vcs.Push.Dialog.v2" timestamp="1595492444339">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
-    <state x="1577" y="434" key="Vcs.Push.Dialog.v2/0.0.3440.1400@0.0.3440.1400" timestamp="1594027686781" />
+    <state x="1577" y="434" key="Vcs.Push.Dialog.v2/0.0.3440.1400@0.0.3440.1400" timestamp="1595492444339" />
     <state x="1434" y="390" key="VcsDiffUtil.ChangesDialog" timestamp="1590181346690">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
@@ -751,10 +767,6 @@
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
     <state x="1783" y="582" key="cloudConfig.PluginsDialog/0.0.3440.1400@0.0.3440.1400" timestamp="1589293304413" />
-    <state x="1890" y="582" key="cloudConfig.SelfSettingsDialog" timestamp="1586974302349">
-      <screen x="0" y="0" width="3440" height="1400" />
-    </state>
-    <state x="1890" y="582" key="cloudConfig.SelfSettingsDialog/0.0.3440.1400@0.0.3440.1400" timestamp="1586974302349" />
     <state x="1322" y="410" key="com.intellij.execution.console.ConsoleHistoryController$MyBrowseAction$1" timestamp="1591285205041">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
@@ -775,10 +787,10 @@
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
     <state x="1788" y="611" width="618" height="286" key="org.intellij.images.editor.actions.BackgroundImageDialog/0.0.3440.1400@0.0.3440.1400" timestamp="1591110076342" />
-    <state x="1721" y="340" width="672" height="678" key="search.everywhere.popup" timestamp="1594723359798">
+    <state x="1721" y="340" width="672" height="678" key="search.everywhere.popup" timestamp="1595581331692">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
-    <state x="1721" y="340" width="672" height="678" key="search.everywhere.popup/0.0.3440.1400@0.0.3440.1400" timestamp="1594723359798" />
+    <state x="1721" y="340" width="672" height="678" key="search.everywhere.popup/0.0.3440.1400@0.0.3440.1400" timestamp="1595581331692" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -787,11 +799,6 @@
           <url>file://$PROJECT_DIR$/papers/Energies_Research_paper_2020.py</url>
           <line>12</line>
           <option name="timeStamp" value="31" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/nilm.py</url>
-          <line>178</line>
-          <option name="timeStamp" value="46" />
         </line-breakpoint>
       </breakpoints>
       <default-breakpoints>
@@ -816,7 +823,7 @@
     <SUITE FILE_PATH="coverage/Code$Energies_Research_paper_2020.coverage" NAME="Energies_Research_paper_2020 Coverage Results" MODIFIED="1595423445636" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/papers" />
     <SUITE FILE_PATH="coverage/Code$temp_.coverage" NAME="temp_ Coverage Results" MODIFIED="1590055887974" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/../../../Python_Project_common_package/Writting" />
     <SUITE FILE_PATH="coverage/Code$pytest_in_main_py.coverage" NAME="pytest in main.py Coverage Results" MODIFIED="1587851818182" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
-    <SUITE FILE_PATH="coverage/Code$nilm.coverage" NAME="nilm Coverage Results" MODIFIED="1595492019951" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/Code$nilm.coverage" NAME="nilm Coverage Results" MODIFIED="1595664078972" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/Code$utils.coverage" NAME="utils Coverage Results" MODIFIED="1590480377633" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/../../../Python_Project_common_package/Correlation_Modeling" />
     <SUITE FILE_PATH="coverage/Code$temp3.coverage" NAME="temp3 Coverage Results" MODIFIED="1589125244220" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
   </component>

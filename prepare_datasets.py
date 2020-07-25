@@ -311,7 +311,7 @@ class NILMTorchDataset(TorchDataSet):
     def __init__(self, data: pd.DataFrame,
                  *, country,
                  sequence_length: int,
-                 over_lapping: bool = False,
+                 over_lapping: Union[bool, int] = False,
                  transform_args_file_path: Path,
                  ):
         """
@@ -411,18 +411,18 @@ class NILMTorchDataset(TorchDataSet):
 class NILMTorchDatasetForecast(NILMTorchDataset):
 
     def __len__(self):
-        if self.over_lapping:
-            raise NotImplementedError
-        else:
-            return int(self.data.__len__() / self.sequence_length) - 1
+        # if self.over_lapping:
+        #     # return int((self.data.__len__() / self.sequence_length) / self.over_lapping) - 1
+        #     return int(self.data.__len__() / self.sequence_length) - 1 - self.over_lapping
+        # else:
+        return int(self.data.__len__() / self.sequence_length) - 7
 
     def __getitem__(self, index: int):
         # 决定索引的位置
-        if self.over_lapping:
-            raise NotImplementedError
-        else:
-            index_slice_x = slice(index * self.sequence_length, (index + 1) * self.sequence_length)
-            index_slice_y = slice((index + 1) * self.sequence_length, (index + 2) * self.sequence_length)
+        # if self.over_lapping:
+        #     index *= 3
+        index_slice_x = slice(index * self.sequence_length, (index + 7) * self.sequence_length)
+        index_slice_y = slice((index + 7) * self.sequence_length, (index + 8) * self.sequence_length)
         data_x = self.transformed_data[0][index_slice_x]  # type: torch.tensor
         data_y = self.transformed_data[1][index_slice_y]  # type: torch.tensor
         return data_x, data_y
