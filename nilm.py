@@ -1,5 +1,5 @@
 from Regression_Analysis.DeepLearning_Class import StackedBiLSTM, LSTMEncoderDecoderWrapper, LSTMEncoder, \
-    LSTMCellDecoder
+    LSTMCellDecoder, LSTMDecoder, TensorFlowLSTMDecoder, TensorFlowLSTMEncoder, TensorFlowAttention
 import pandas as pd
 from pandas import DataFrame
 from Ploting.fast_plot_Func import *
@@ -23,10 +23,13 @@ from typing import List
 import os
 import copy
 
-os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':16:8'
+# os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':16:8'
+
 # os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 torch.backends.cudnn.enabled = False
+
+
 # torch.backends.cudnn.benchmark = True
 # torch.cuda.set_device(0)
 
@@ -34,7 +37,8 @@ torch.backends.cudnn.enabled = False
 def energies_paper_prepare_dataset_for_torch_model_for_ampds2_dataset(*, appliance_original_name: List[str] = None,
                                                                       appliance_type_name: str = None,
                                                                       sample_period: int,
-                                                                      transform_args_file_path: Path):
+                                                                      transform_args_file_path: Path,
+                                                                      sets_save_path: Path = None):
     """
     返回专门针对pytorch的nn模型的dataset
     :param appliance_original_name: 可选['HPE', 'FRE', 'CDE']
@@ -43,6 +47,7 @@ def energies_paper_prepare_dataset_for_torch_model_for_ampds2_dataset(*, applian
                           'Heating'只包含'HPE'
     :param sample_period: 必选。重采样。单位是秒
     :param transform_args_file_path
+    :param sets_save_path
     """
     if ((appliance_original_name or appliance_type_name) is None) or (
             (appliance_original_name is not None) and (appliance_type_name is not None)):
@@ -94,33 +99,120 @@ def energies_paper_prepare_dataset_for_torch_model_for_ampds2_dataset(*, applian
         # 生成TorchDataset对象
         # 注意transform_args.pkl的命名方式，这样让training set和test set共用一组参数，只与用电器有关,
         # 由training set决定，因为loop中它在先
-        # tt.__len__()
-        # tt[0]
-        # func = lambda x: x.cpu().numpy()
-        # x1, y1 = tt[0]
-        # x2, y2 = tt[1]
-        # x7, y7 = tt[6]
-        # x8, y8 = tt[7]
-        #
-        # x1 = func(x1)
-        # y1 = func(y1)
-        #
-        # x2 = func(x2)
-        # y2 = func(y2)
-        #
-        # x7 = func(x7)
-        # y7 = func(y7)
-        #
-        # x8 = func(x8)
-        # y8 = func(y8)
-
         torch_sets.append(NILMTorchDatasetForecast(data,
                                                    # 即：一天中的样本个数
                                                    sequence_length=int((3600 * 24) / sample_period),
                                                    transform_args_file_path=transform_args_file_path,
                                                    country=Canada(),
-                                                   over_lapping=3))
-    return tuple(torch_sets)
+                                                   over_lapping=1))
+    if sets_save_path:
+        train_np, test_np = [], []
+        for i in range(torch_sets[0].__len__()):
+            train_np.append(list(map(lambda x: x.cpu().numpy(), torch_sets[0][i])))
+            test_np.append(list(map(lambda x: x.cpu().numpy(), torch_sets[1][i])))
+        save_pkl_file(sets_save_path, {'train': train_np, 'test': test_np})
+    torch_sets = tuple(torch_sets)
+    return torch_sets
+
+
+def energies_paper_load_ampds2_dataset_train_np_and_test_np(file_path: Path = None):
+    file_path = file_path or (Path(project_path_) / 'Data/Results/Energies_paper/Ampds2/lstm/forecast/input_week/'
+                                                    'sets_HPE_and_total_60_transform_args.pkl')
+    return load_pkl_file(file_path)
+
+
+def energies_paper_train_tf_model_for_ampds2_dataset(model_save_path: Path):
+    import tensorflow as tf
+
+    training_set = energies_paper_load_ampds2_dataset_train_np_and_test_np()['train']
+
+    def training_set_gen():
+        for i in range(training_set.__len__()):
+            yield training_set[i][0], training_set[i][1]
+
+    batch_size = 1
+    steps_per_epoch = len(training_set) // batch_size
+    tf_training_set = tf.data.Dataset.from_generator(training_set_gen, (np.float32, np.float32))
+    tf_training_set = tf_training_set.batch(batch_size=batch_size, drop_remainder=False)
+
+    tf_lstm_encoder = TensorFlowLSTMEncoder(hidden_size=32,
+                                            training_mode=True)
+    tf_lstm_decoder = TensorFlowLSTMDecoder(hidden_size=32,
+                                            training_mode=True,
+                                            output_feature_len=2)
+
+    # # sample input
+    # example_input_batch = next(iter(tf_training_set))[0]
+    # sample_hidden = tf_lstm_encoder.initialize_h_0_c_0(batch_size)
+    # sample_output, sample_hidden = tf_lstm_encoder(x=example_input_batch, h_0_c_0_list=sample_hidden)
+
+    # attention_layer = TensorFlowAttention(10)
+    # attention_result, attention_weights = attention_layer(sample_hidden[0], sample_output)
+    #
+    # sample_decoder_output, _, _ = tf_lstm_decoder(tf.random.uniform((batch_size, 1)),
+    #                                               sample_hidden, sample_output)
+
+    optimizer = tf.keras.optimizers.Adam()
+    loss_func = tf.keras.losses.mean_squared_error
+
+    # %% Check point
+    checkpoint_dir = './training_checkpoints'
+    checkpoint_prefix = os.path.join(checkpoint_dir, "ckpt")
+    checkpoint = tf.train.Checkpoint(optimizer=optimizer,
+                                     encoder=tf_lstm_encoder,
+                                     decoder=tf_lstm_decoder)
+
+    # %% train step
+    @tf.function
+    def train_step(_x, _y, _encoder_hidden):
+        loss = 0
+
+        with tf.GradientTape() as tape:
+            encoder_output, _encoder_hidden = tf_lstm_encoder(x=_x,
+                                                              h_0_c_0_list=_encoder_hidden)
+            decoder_hidden = encoder_hidden
+            decoder_input = tf.zeros((batch_size, 2))
+
+            # Teacher forcing - feeding the target as the next input
+            for this_time_step in range(0, _y.shape[1]):
+                print(this_time_step)
+                # passing enc_output to the decoder
+                predictions, decoder_hidden, _ = tf_lstm_decoder(
+                    decoder_input,
+                    decoder_hidden,
+                    encoder_output
+                )
+                loss += loss_func(y[:, this_time_step, :], predictions)
+        _batch_loss = (loss / int(_y.shape[1]))
+        print(f"_batch_loss = {_batch_loss}")
+        variables = tf_lstm_encoder.trainable_variables + tf_lstm_decoder.trainable_variables
+
+        gradients = tape.gradient(loss, variables)
+
+        optimizer.apply_gradients(zip(gradients, variables))
+
+        return _batch_loss
+
+    # %% train
+    epoch = 10
+    for epoch_idx in range(epoch):
+        start_time = time.time()
+
+        encoder_hidden = tf_lstm_encoder.initialize_h_0_c_0(batch_size)
+
+        total_loss = 0
+        for (batch_idx, (x, y)) in enumerate(tf_training_set.take(steps_per_epoch)):
+            batch_loss = train_step(x, y, encoder_hidden)
+            print(f"batch_idx = {batch_idx} finished")
+            total_loss += batch_loss
+            print('Epoch {} Batch {} Loss {:.4f}'.format(epoch_idx + 1,
+                                                         batch_idx,
+                                                         batch_loss.numpy()))
+        if True:
+            checkpoint.save(file_prefix=checkpoint_prefix)
+        print('Epoch {} Loss {:.4f}'.format(epoch_idx + 1,
+                                            total_loss / steps_per_epoch))
+        print('Time taken for 1 epoch {} sec\n'.format(time.time() - start_time))
 
 
 def energies_paper_train_torch_model_for_ampds2_dataset(*, appliance_original_name: str = None,
@@ -133,13 +225,15 @@ def energies_paper_train_torch_model_for_ampds2_dataset(*, appliance_original_na
     if True:
         # if not try_to_find_file(model_save_path):
         ############################################################
-        epoch_num = 35
-        training_torch_set_dl_bs = 13
+        epoch_num = 5
+        training_torch_set_dl_bs = 14
 
-        hidden_size = 256
-        learning_rate = 1e-4
-        weight_decay = 0.00001
-        dropout = 0.1
+        hidden_size = 32
+        learning_rate = 1e-3
+        weight_decay = 0.000001
+        dropout = 0.05
+
+        lstm_layer_num = 2
         #############################################################
         training_torch_set = energies_paper_prepare_dataset_for_torch_model_for_ampds2_dataset(
             appliance_original_name=appliance_original_name,
@@ -158,7 +252,7 @@ def energies_paper_train_torch_model_for_ampds2_dataset(*, appliance_original_na
         output_sequence_len = training_torch_set[0][1].size()[-2]
 
         lstm_encoder = LSTMEncoder(
-            lstm_num_layers=2,
+            lstm_layer_num=lstm_layer_num,
             input_feature_len=input_feature_len,
             sequence_len=input_sequence_len,
             output_feature_len=output_feature_len,
@@ -166,22 +260,24 @@ def energies_paper_train_torch_model_for_ampds2_dataset(*, appliance_original_na
             bidirectional=True,
             dropout=dropout
         )
-        lstm_encoder.train()
 
-        lstm_decoder_cell = LSTMCellDecoder(
+        lstm_decoder = LSTMDecoder(
+            lstm_layer_num=lstm_layer_num,
             output_feature_len=output_feature_len,
             hidden_size=hidden_size,
-            dropout=dropout
+            dropout=dropout,
+            decoder_input_feature_len=output_feature_len + hidden_size,
+            lstm_hidden_size=hidden_size,
+            attention_units=8,
         )
-        lstm_decoder_cell.train()
 
         simple_lstm_model = LSTMEncoderDecoderWrapper(
             lstm_encoder=lstm_encoder,
-            lstm_decoder_cell=lstm_decoder_cell,
+            lstm_decoder=lstm_decoder,
             output_sequence_len=output_sequence_len,
-            output_feature_len=output_feature_len
+            output_feature_len=output_feature_len,
+            teacher_forcing=0.5
         )
-        simple_lstm_model.train()
         # simple_lstm_model = StackedBiLSTM(input_size=training_torch_set[0][0].size()[-1],
         #                                   hidden_size=hidden_size,
         #                                   output_size=training_torch_set[0][1].size()[-1],
@@ -199,19 +295,26 @@ def energies_paper_train_torch_model_for_ampds2_dataset(*, appliance_original_na
         start_time = time.time()
         epoch_loss = []
         for i in range(epoch_num):
-            simple_lstm_model.train()
+            epoch_start_time = time.time()
+
+            simple_lstm_model.set_train()
             batch_loss = []
             for index, (xb, yb) in enumerate(training_torch_set_dl):
-                # pred = simple_lstm_model(xb, yb)
                 pred = simple_lstm_model(xb, yb)
-                loss = loss_func(pred, yb).cuda()
+                # series(pred[0, :, 0].detach().cpu().numpy().flatten(), label='LSTM', figure_size=(10, 2.4))
+                loss = loss_func(pred, yb)
                 opt.zero_grad()
                 loss.backward()
                 opt.step()
                 batch_loss.append(loss.item())
                 print(f"第{i + 1: d}个epoch, 第{index + 1: d}个batch, loss={loss}")
             print(f"第{i + 1: d}个epoch结束, 平均loss={np.mean(batch_loss)}")
+            print(f"第{i + 1: d}个epoch结束, 耗时{time.time() - epoch_start_time}")
             epoch_loss.append(batch_loss)
+            if i % 10 == 0:
+                torch.save(simple_lstm_model,
+                           model_save_path.parent / (model_save_path.stem + f"_epoch_{i}" + model_save_path.suffix))
+
         # 保存整个模型
         torch.save(simple_lstm_model, model_save_path)
         # 保存训练时间和loss
@@ -241,7 +344,7 @@ def energies_paper_test_torch_model_for_ampds2_dataset(*, appliance_original_nam
                          for i in range(test_torch_set.__len__())}
 
     for index, (xb, yb) in enumerate(test_torch_set_dl):
-        model.eval()
+        model.set_eval()
         pred = model(xb)
         ax = series(test_torch_set.data.index[
                     index * test_torch_set.sequence_length:(index + 1) * test_torch_set.sequence_length
@@ -303,6 +406,7 @@ def energies_paper_train_nilm_models_for_ampds2_dataset(top_n: int = 3):
 
 
 if __name__ == '__main__':
+    # tt = energies_paper_load_ampds2_dataset_train_np_and_test_np()
     # for _sample_period in (60, 60 * 30):
     # for this_type in ('Lighting',):
     #     # energies_paper_train_torch_model_for_ampds2_dataset(
@@ -342,6 +446,7 @@ if __name__ == '__main__':
         transform_args_file_path=Path(project_path_) / 'Data/Results/Energies_paper/Ampds2/lstm/forecast/input_week/'
                                                        f'HPE_and_total_{_sample_period}_transform_args.pkl'
     )
+
     # energies_paper_test_torch_model_for_ampds2_dataset(
     #     appliance_original_name='HPE',
     #     model_save_path=Path(project_path_) / 'Data/Results/Energies_paper/Ampds2/lstm/forecast/input_week/'
@@ -349,4 +454,9 @@ if __name__ == '__main__':
     #     sample_period=_sample_period,
     #     transform_args_file_path=Path(project_path_) / 'Data/Results/Energies_paper/Ampds2/lstm/forecast/input_week/'
     #                                                    f'HPE_and_total_{_sample_period}_transform_args.pkl'
+    # )
+
+    # energies_paper_train_tf_model_for_ampds2_dataset(
+    #     Path(project_path_) / 'Data/Results/Energies_paper/Ampds2/lstm/forecast/input_week/'
+    #                           'TensorFlow_HPE_and_total_60.pkl'
     # )

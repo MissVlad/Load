@@ -151,7 +151,7 @@ def load_low_carbon_london_heat(this_no, df_name: str):
 
         elif df_name == 'heat':
             this_figure_buffer_list_heat.append(
-                plot_for_heat(this_df_i.index, this_df_i.iloc[:, 0].values))
+                plot_for_heat(this_df_i.index, this_df_i.iloc[:, -1].values))
             figure_buffer_list_specific.append(this_figure_buffer_list_heat)
 
         else:
@@ -411,16 +411,10 @@ class NILMTorchDataset(TorchDataSet):
 class NILMTorchDatasetForecast(NILMTorchDataset):
 
     def __len__(self):
-        # if self.over_lapping:
-        #     # return int((self.data.__len__() / self.sequence_length) / self.over_lapping) - 1
-        #     return int(self.data.__len__() / self.sequence_length) - 1 - self.over_lapping
-        # else:
         return int(self.data.__len__() / self.sequence_length) - 7
 
     def __getitem__(self, index: int):
         # 决定索引的位置
-        # if self.over_lapping:
-        #     index *= 3
         index_slice_x = slice(index * self.sequence_length, (index + 7) * self.sequence_length)
         index_slice_y = slice((index + 7) * self.sequence_length, (index + 8) * self.sequence_length)
         data_x = self.transformed_data[0][index_slice_x]  # type: torch.tensor
@@ -573,6 +567,6 @@ if __name__ == '__main__':
     # John_data = ScotlandLongerDataset('John')
     # John_data.set_weekends_and_holiday_to_zeros()
     for _this_no in (1, 2, 3, 4, 5, 7):
-        for this_type in ('electric', 'heat', 'electric and heat'):
+        for this_type in ('heat', 'electric', 'electric and heat'):
             load_low_carbon_london_heat(_this_no, this_type)
     # load_ampds2_weather()
