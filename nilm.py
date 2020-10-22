@@ -1,14 +1,14 @@
-from Regression_Analysis.DeepLearning_Class import StackedBiLSTM, LSTMEncoderDecoderWrapper, LSTMEncoder, \
-    LSTMCellDecoder, LSTMDecoder, TensorFlowLSTMDecoder, TensorFlowLSTMEncoder, TensorFlowAttention
+from Regression_Analysis.DeepLearning_Class import StackedBiLSTM, GRUEncoderDecoderWrapper, GRUEncoder, \
+    GRUDecoder, TensorFlowLSTMDecoder, TensorFlowLSTMEncoder, TensorFlowAttention
 import pandas as pd
 from pandas import DataFrame
 from Ploting.fast_plot_Func import *
-from project_path_Var import project_path_
+from project_utils import project_path_
 from prepare_datasets import get_training_set_and_test_set_for_ampds2_dataset, NILMTorchDatasetForecast, \
-    load_ampds2_weather
+    load_ampds2_weather, NILMTorchDataset
 from nilmtk.legacy.disaggregate import CombinatorialOptimisation, FHMM
 from pathlib import Path
-from File_Management.path_and_file_management_Func import try_to_find_file
+from File_Management.path_and_file_management_Func import try_to_find_file, try_to_find_folder_path_otherwise_make_one
 from File_Management.load_save_Func import load_pkl_file, save_pkl_file
 from TimeSeries_Class import merge_two_time_series_df
 from torch.utils.data import DataLoader
@@ -23,11 +23,12 @@ from typing import List
 import os
 import copy
 
+
 # os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':16:8'
 
 # os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
-torch.backends.cudnn.enabled = False
+# torch.backends.cudnn.enabled = False
 
 
 # torch.backends.cudnn.benchmark = True
@@ -103,8 +104,11 @@ def energies_paper_prepare_dataset_for_torch_model_for_ampds2_dataset(*, applian
                                                    # 即：一天中的样本个数
                                                    sequence_length=int((3600 * 24) / sample_period),
                                                    transform_args_file_path=transform_args_file_path,
-                                                   country=Canada(),
-                                                   over_lapping=1))
+                                                   country=Canada()))
+        tt1 = torch_sets[0][1]
+        tt2 = torch_sets[0][2]
+        tt3 = torch_sets[0][3]
+        cc = 1
     if sets_save_path:
         train_np, test_np = [], []
         for i in range(torch_sets[0].__len__()):
@@ -130,7 +134,7 @@ def energies_paper_train_tf_model_for_ampds2_dataset(model_save_path: Path):
         for i in range(training_set.__len__()):
             yield training_set[i][0], training_set[i][1]
 
-    batch_size = 1
+    batch_size = 2
     steps_per_epoch = len(training_set) // batch_size
     tf_training_set = tf.data.Dataset.from_generator(training_set_gen, (np.float32, np.float32))
     tf_training_set = tf_training_set.batch(batch_size=batch_size, drop_remainder=False)
@@ -194,7 +198,7 @@ def energies_paper_train_tf_model_for_ampds2_dataset(model_save_path: Path):
         return _batch_loss
 
     # %% train
-    epoch = 10
+    epoch = 25000
     for epoch_idx in range(epoch):
         start_time = time.time()
 
@@ -225,25 +229,34 @@ def energies_paper_train_torch_model_for_ampds2_dataset(*, appliance_original_na
     if True:
         # if not try_to_find_file(model_save_path):
         ############################################################
-        epoch_num = 5
-        training_torch_set_dl_bs = 14
+        epoch_num = 25000
+        training_torch_set_dl_bs = 90
+        # training_torch_set_dl_bs = 25
 
-        hidden_size = 32
-        learning_rate = 1e-3
+        hidden_size = 1024
+        learning_rate = 1e-4
+        # weight_decay = 0.00000001
         weight_decay = 0.000001
-        dropout = 0.05
 
-        lstm_layer_num = 2
+        dropout = 0.1
+
+        lstm_layer_num = 3
         #############################################################
-        training_torch_set = energies_paper_prepare_dataset_for_torch_model_for_ampds2_dataset(
+        training_torch_set, test_torch_set = energies_paper_prepare_dataset_for_torch_model_for_ampds2_dataset(
             appliance_original_name=appliance_original_name,
             appliance_type_name=appliance_type_name,
             sample_period=sample_period,
             transform_args_file_path=transform_args_file_path
-        )[0]
+        )
+        save_pkl_file(Path(r'.\training_torch_set'), training_torch_set)
+        training_torch_set = load_pkl_file(Path(r'.\training_torch_set'))
+
         training_torch_set_dl = DataLoader(training_torch_set,
                                            batch_size=training_torch_set_dl_bs,
                                            shuffle=False)
+        save_pkl_file(Path(r'.\training_torch_set_dl'), training_torch_set_dl)
+        training_torch_set_dl = load_pkl_file(Path(r'.\training_torch_set_dl'))
+
         # %% 定义模型
         input_feature_len = training_torch_set[0][0].size()[-1]
         input_sequence_len = training_torch_set[0][0].size()[-2]
@@ -251,46 +264,47 @@ def energies_paper_train_torch_model_for_ampds2_dataset(*, appliance_original_na
         output_feature_len = training_torch_set[0][1].size()[-1]
         output_sequence_len = training_torch_set[0][1].size()[-2]
 
-        lstm_encoder = LSTMEncoder(
-            lstm_layer_num=lstm_layer_num,
-            input_feature_len=input_feature_len,
-            sequence_len=input_sequence_len,
-            output_feature_len=output_feature_len,
-            hidden_size=hidden_size,
-            bidirectional=True,
-            dropout=dropout
-        )
+        # lstm_encoder = GRUEncoder(
+        #     gru_layer_num=lstm_layer_num,
+        #     input_feature_len=input_feature_len,
+        #     sequence_len=input_sequence_len,
+        #     hidden_size=hidden_size,
+        #     bidirectional=False,
+        #     dropout=dropout
+        # )
+        #
+        # lstm_decoder = GRUDecoder(
+        #     gru_layer_num=lstm_layer_num,
+        #     output_feature_len=output_feature_len,
+        #     hidden_size=hidden_size,
+        #     dropout=dropout,
+        #     decoder_input_feature_len=hidden_size,
+        #     attention_units=32,
+        # )
+        #
+        # simple_lstm_model = GRUEncoderDecoderWrapper(
+        #     gru_encoder=lstm_encoder,
+        #     gru_decoder=lstm_decoder,
+        #     output_sequence_len=output_sequence_len,
+        #     output_feature_len=output_feature_len,
+        #     teacher_forcing=0.01
+        # )
 
-        lstm_decoder = LSTMDecoder(
-            lstm_layer_num=lstm_layer_num,
-            output_feature_len=output_feature_len,
-            hidden_size=hidden_size,
-            dropout=dropout,
-            decoder_input_feature_len=output_feature_len + hidden_size,
-            lstm_hidden_size=hidden_size,
-            attention_units=8,
-        )
-
-        simple_lstm_model = LSTMEncoderDecoderWrapper(
-            lstm_encoder=lstm_encoder,
-            lstm_decoder=lstm_decoder,
-            output_sequence_len=output_sequence_len,
-            output_feature_len=output_feature_len,
-            teacher_forcing=0.5
-        )
-        # simple_lstm_model = StackedBiLSTM(input_size=training_torch_set[0][0].size()[-1],
-        #                                   hidden_size=hidden_size,
-        #                                   output_size=training_torch_set[0][1].size()[-1],
-        #                                   dropout=dropout,
-        #                                   sequence_len=training_torch_set[0][0].size()[-2])
+        simple_lstm_model = StackedBiLSTM(lstm_layer_num=lstm_layer_num,
+                                          input_feature_len=input_feature_len,
+                                          hidden_size=hidden_size,
+                                          output_feature_len=output_feature_len,
+                                          dropout=dropout)
 
         # simple_lstm_model = torch.nn.DataParallel(simple_lstm_model, device_ids=[0]).cuda()  # 将模型转为cuda类型
         # %% 定义优化器
+
         opt = torch.optim.Adam(simple_lstm_model.parameters(),
                                lr=learning_rate,
                                weight_decay=weight_decay)  # weight_decay代表L2正则化
         # %% 定义loss函数
         loss_func = mse_loss
+
         # %% 开始train
         start_time = time.time()
         epoch_loss = []
@@ -300,20 +314,32 @@ def energies_paper_train_torch_model_for_ampds2_dataset(*, appliance_original_na
             simple_lstm_model.set_train()
             batch_loss = []
             for index, (xb, yb) in enumerate(training_torch_set_dl):
-                pred = simple_lstm_model(xb, yb)
-                # series(pred[0, :, 0].detach().cpu().numpy().flatten(), label='LSTM', figure_size=(10, 2.4))
+                pred = simple_lstm_model(xb)
+
+                ##############################################################################
+                # simple_lstm_model.set_eval()
+                # pred = simple_lstm_model(xb)
+                # series(xb[0, :, -1].detach().cpu().numpy().flatten(), label='X', figure_size=(10, 2.4))
+                # ax = series(yb[0, :, -1].detach().cpu().numpy().flatten(), label='Truth', figure_size=(10, 2.4))
+                # ax = series(pred[0, :, -1].detach().cpu().numpy().flatten(), ax=ax, label='LSTM', figure_size=(10, 2.4))
+                ##############################################################################
+
                 loss = loss_func(pred, yb)
                 opt.zero_grad()
                 loss.backward()
                 opt.step()
                 batch_loss.append(loss.item())
                 print(f"第{i + 1: d}个epoch, 第{index + 1: d}个batch, loss={loss}")
+
             print(f"第{i + 1: d}个epoch结束, 平均loss={np.mean(batch_loss)}")
             print(f"第{i + 1: d}个epoch结束, 耗时{time.time() - epoch_start_time}")
             epoch_loss.append(batch_loss)
-            if i % 10 == 0:
-                torch.save(simple_lstm_model,
-                           model_save_path.parent / (model_save_path.stem + f"_epoch_{i}" + model_save_path.suffix))
+            if (i % 1000 == 0) and (i != 0):
+                try_to_find_folder_path_otherwise_make_one(model_save_path.parent)
+                torch.save(
+                    simple_lstm_model,
+                    model_save_path.parent / (model_save_path.stem + f"_epoch_{i}" + model_save_path.suffix)
+                )
 
         # 保存整个模型
         torch.save(simple_lstm_model, model_save_path)
@@ -331,42 +357,49 @@ def energies_paper_test_torch_model_for_ampds2_dataset(*, appliance_original_nam
                                                        model_save_path: Path,
                                                        transform_args_file_path: Path):
     model = torch.load(model_save_path)
+    model.set_eval()
     # 载入测试集
     test_torch_set = energies_paper_prepare_dataset_for_torch_model_for_ampds2_dataset(
         appliance_original_name=appliance_original_name,
         appliance_type_name=appliance_type_name,
         sample_period=sample_period,
-        transform_args_file_path=transform_args_file_path)[0]
+        transform_args_file_path=transform_args_file_path)[1]
     test_torch_set_dl = DataLoader(test_torch_set,
                                    batch_size=1,
                                    shuffle=False)
-    save_as_docx_buff = {(test_torch_set.data.index[0] + datetime.timedelta(days=i)).strftime("%Y_%m_%d"): [None, None]
-                         for i in range(test_torch_set.__len__())}
+    # save_as_docx_buff = {(test_torch_set.data.index[0] + datetime.timedelta(days=i)).strftime("%Y_%m_%d"): [None, None]
+    #                      for i in range(test_torch_set.__len__())}
+    # max
+    ave = []
+    for i in range(test_torch_set.__len__()):
+        ave.append(np.mean(test_torch_set[i][1].cpu().numpy()[:, 0]))
+    index = np.argmax(ave)
+    for index in range(test_torch_set.__len__()):
+        xb = test_torch_set[index][0].unsqueeze(0)
+        yb = test_torch_set[index][1]
+        xb_raw = test_torch_set.get_raw_data(index)[0]
+        yb_raw = test_torch_set.get_raw_data(index)[1]
+        pred = model(xb).squeeze(0)
 
-    for index, (xb, yb) in enumerate(test_torch_set_dl):
-        model.set_eval()
-        pred = model(xb)
-        ax = series(test_torch_set.data.index[
-                    index * test_torch_set.sequence_length:(index + 1) * test_torch_set.sequence_length
-                    ].to_pydatetime(),
-                    pred[0, :, 0].detach().cpu().numpy().flatten(), label='LSTM', figure_size=(10, 2.4))
-        x_plot = test_torch_set.data.index[
-                 index * test_torch_set.sequence_length:(index + 1) * test_torch_set.sequence_length].to_pydatetime()
-        buf = series(
+        dim = 1
+        title = (appliance_original_name or appliance_type_name) if dim == 1 else 'Total'
+        x_plot = yb_raw.index.to_pydatetime()
+
+        ax = series(x_plot,
+                    pred[:, dim].detach().cpu().numpy().flatten(), label='LSTM', figure_size=(10, 2.4))
+
+        ax = series(
             x_plot,
-            yb.cpu().numpy().flatten(),
+            yb[:, dim].cpu().numpy().flatten(),
+            linestyle='--',
             ax=ax,
             label='Truth',
             x_label='Time',
-            y_label='Normlised active power (p.u.)',
+            y_label='Normlised Active Power [p.u.]',
             figure_size=(10, 2.4),
-            title=appliance_original_name or appliance_type_name,
-            save_to_buffer=True)
-        save_as_docx_buff[(test_torch_set.data.index[0] + datetime.timedelta(days=index)).strftime("%Y_%m_%d")][0] = buf
-    put_cached_png_into_a_docx(save_as_docx_buff,
-                               model_save_path.parent / f'{appliance_original_name or appliance_type_name}_'
-                                                        f'{sample_period}.docx',
-                               1)
+            title=title,
+        )
+
     # 画loss
     # _loss = tt['training_time_and_loss']['loss']
     # _loss = np.array(list(map(lambda x: np.array(x, dtype=float), _loss)))
@@ -437,24 +470,24 @@ if __name__ == '__main__':
     # energies_paper_prepare_dataset_for_torch_model_for_ampds2_dataset(appliance_original_name=['HPE'],
     #                                                                   sample_period=1800)
 
-    _sample_period = 60
-    energies_paper_train_torch_model_for_ampds2_dataset(
-        appliance_original_name='HPE',
-        model_save_path=Path(project_path_) / 'Data/Results/Energies_paper/Ampds2/lstm/forecast/input_week/'
-                                              f'HPE_and_total_{_sample_period}.pkl',
-        sample_period=_sample_period,
-        transform_args_file_path=Path(project_path_) / 'Data/Results/Energies_paper/Ampds2/lstm/forecast/input_week/'
-                                                       f'HPE_and_total_{_sample_period}_transform_args.pkl'
-    )
-
-    # energies_paper_test_torch_model_for_ampds2_dataset(
+    _sample_period = 300
+    # energies_paper_train_torch_model_for_ampds2_dataset(
     #     appliance_original_name='HPE',
-    #     model_save_path=Path(project_path_) / 'Data/Results/Energies_paper/Ampds2/lstm/forecast/input_week/'
+    #     model_save_path=Path(project_path_) / 'Data/Results/Energies_paper/Ampds2/lstm/forecast/input_21_days/HPE_IN/'
     #                                           f'HPE_and_total_{_sample_period}.pkl',
     #     sample_period=_sample_period,
-    #     transform_args_file_path=Path(project_path_) / 'Data/Results/Energies_paper/Ampds2/lstm/forecast/input_week/'
-    #                                                    f'HPE_and_total_{_sample_period}_transform_args.pkl'
+    #     transform_args_file_path=Path(project_path_) / 'Data/Results/Energies_paper/Ampds2/forecast/input_21_days/'
+    #                                                    f'HPE_IN/HPE_and_total_{_sample_period}_transform_args.pkl'
     # )
+
+    energies_paper_test_torch_model_for_ampds2_dataset(
+        appliance_original_name='HPE',
+        model_save_path=Path(project_path_) / 'Data/Results/Energies_paper/Ampds2/lstm/forecast/input_21_days/'
+                                              f'HPE_and_total_{_sample_period}.pkl',
+        sample_period=_sample_period,
+        transform_args_file_path=Path(project_path_) / 'Data/Results/Energies_paper/Ampds2/lstm/forecast/input_21_days/'
+                                                       f'HPE_and_total_{_sample_period}_transform_args.pkl'
+    )
 
     # energies_paper_train_tf_model_for_ampds2_dataset(
     #     Path(project_path_) / 'Data/Results/Energies_paper/Ampds2/lstm/forecast/input_week/'

@@ -3,32 +3,270 @@ import os
 from abc import ABCMeta, abstractmethod
 from pathlib import Path
 from typing import Tuple
-
 import pandas as pd
-import torch
-from nilmtk import DataSet, MeterGroup
-from nilmtk.dataset_converters.refit.convert_refit import convert_refit
-from scipy.io import loadmat
-from torch.utils.data import Dataset as TorchDataSet
 
-from File_Management.load_save_Func import load_exist_pkl_file_otherwise_run_and_save
-from File_Management.path_and_file_management_Func import try_to_find_file
+from scipy.io import loadmat
+from File_Management.load_save_Func import *
+from File_Management.path_and_file_management_Func import *
 from Ploting.fast_plot_Func import *
 from TimeSeries_Class import TimeSeries, UnivariateTimeSeries, merge_two_time_series_df
-from Time_Processing.datetime_utils import DatetimeOnehotEncoder
-from project_path_Var import project_path_
+from Time_Processing.datetime_utils import DatetimeOnehotORCircularEncoder
+from project_utils import project_path_
 import copy
-from Writting import docx_document_template_to_collect_figures
-from docx.shared import Cm, Pt
-from docx.enum.text import WD_BREAK
+import getpass
 from dateutil import tz
 from pandas import DataFrame
-from workalendar.america import Canada
-from Time_Processing.datetime_utils import DatetimeOnehotEncoder
-from pyorbital.moon_phase import moon_phase
+from Time_Processing.datetime_utils import DatetimeOnehotORCircularEncoder
+
+try:
+    from nilmtk import DataSet, MeterGroup
+    from nilmtk.dataset_converters.refit.convert_refit import convert_refit
+    from pyorbital.moon_phase import moon_phase
+    from workalendar.america import Canada
+
+except ModuleNotFoundError:
+    pass
+
+try:
+    import torch
+    from Writting import docx_document_template_to_collect_figures
+    from torch.utils.data import Dataset as TorchDataSet
+    from docx.shared import Cm, Pt
+    from docx.enum.text import WD_BREAK
+    from workalendar.america import Canada
+    from pyorbital.moon_phase import moon_phase
+
+
+    class NILMTorchDataset(TorchDataSet):
+        """
+        专门针对PyTorch的模型的Dataset
+        """
+        __slots__ = ('data', 'transformed_data', 'sequence_length', 'over_lapping', 'country')
+
+        def __init__(self, data: pd.DataFrame,
+                     *, country,
+                     sequence_length: int,
+                     over_lapping: Union[bool, int] = False,
+                     transform_args_file_path: Path):
+            """
+            :param data 所有数据，包括x和y，形如下面的一个pd.DataFrame
+                               temperature  solar irradiation   precipitation   air density   mains_var   appliance_var
+            time_stamp_index
+            .
+            .
+            .
+            TODO: solar
+            transform_args: 形如下面的一个pd.DataFrame
+                      temperature  solar irradiation   precipitation   air density   mains_var   appliance_var
+
+            minimum
+            maximum
+            :param transform_args_file_path
+            """
+            self.data = data  # type: pd.DataFrame
+            self.sequence_length = sequence_length  # type: int
+            self.over_lapping = over_lapping
+            self.country = country
+            # 最后进行transform
+            self.transformed_data = self._transform(
+                transform_args_file_path
+            )  # type: Tuple[torch.tensor, torch.tensor, torch.tensor]
+
+        def __len__(self):
+            if self.over_lapping:
+                return self.data.__len__() - self.sequence_length + 1
+            else:
+                return int(self.data.__len__() / self.sequence_length)
+
+        def __getitem__(self, index: int):
+            # 决定索引的位置
+            if self.over_lapping:
+                index_slice = slice(index, index + self.sequence_length)
+            else:
+                index_slice = slice(index * self.sequence_length, (index + 1) * self.sequence_length)
+            data_x = self.transformed_data[0][index_slice]  # type: torch.tensor
+            data_y = self.transformed_data[1][index_slice]  # type: torch.tensor
+            return (data_x,
+                    data_y,
+                    self.transformed_data[2][index_slice],
+                    self.transformed_data[2][index_slice])
+
+        def get_raw_data(self, index):
+            if self.over_lapping:
+                index_slice = slice(index, index + self.sequence_length)
+            else:
+                index_slice = slice(index * self.sequence_length, (index + 1) * self.sequence_length)
+            return self.transformed_data[2][index_slice], self.transformed_data[2][index_slice]
+
+        def _transform(self, transform_args_file_path, mode='NILM') -> Tuple[torch.tensor, torch.tensor, pd.DataFrame]:
+            # WARNING: full_data_df.index is not used! because stupid Pandas force to have DST transformation,
+            # causing two 1.00 am problem, despite that the original datetime has already been taken care of!
+            # full_data_df['index_index'] = range(full_data_df.shape[0]) # This line is for debug
+            # index_source = full_data_df.index # This line is to use full_data_df.index
+            index_source = pd.DatetimeIndex(pd.date_range(
+                start=datetime.datetime(year=self.data.index[0].year,
+                                        month=self.data.index[0].month,
+                                        day=self.data.index[0].day,
+                                        hour=self.data.index[0].hour,
+                                        minute=self.data.index[0].minute),
+                end=datetime.datetime(year=self.data.index[-1].year,
+                                      month=self.data.index[-1].month,
+                                      day=self.data.index[-1].day,
+                                      hour=self.data.index[-1].hour,
+                                      minute=self.data.index[-1].minute),
+                freq=self.data.index.freq)
+            )
+            # 时间变量
+            datetime_onehot_or_circular_encoder_1 = DatetimeOnehotORCircularEncoder(to_encoding_args=('holiday',
+                                                                                                      'summer_time'),
+                                                                                    mode='circular')
+            time_var_transformed_1 = datetime_onehot_or_circular_encoder_1(self.data.index,
+                                                                           country=self.country)
+            datetime_onehot_or_circular_encoder_2 = DatetimeOnehotORCircularEncoder(to_encoding_args=('month',
+                                                                                                      'weekday'),
+                                                                                    mode='circular')
+            time_var_transformed_2 = datetime_onehot_or_circular_encoder_2(index_source,
+                                                                           country=self.country)
+            # 其它
+            transform_args = self._get_transform_args(transform_args_file_path)
+            other_var_transformed = pd.DataFrame(columns=transform_args.columns)
+            for this_col in transform_args.columns:
+                other_var_transformed.loc[:, this_col] = (self.data.loc[:, this_col] -
+                                                          transform_args.loc['minimum', this_col]) / (
+                                                                 transform_args.loc['maximum', this_col] -
+                                                                 transform_args.loc['minimum', this_col])
+            transformed_x_y = pd.concat(
+                (time_var_transformed_1, time_var_transformed_2,
+                 other_var_transformed.reset_index().drop('TIMESTAMP', axis=1)), axis=1)
+            # TODO 泛化输入的维度，sa又要对比考虑/不考虑HEP in the input...好无聊啊
+            data_x = torch.tensor(transformed_x_y.iloc[:, :].values,
+                                  device='cuda:0',
+                                  dtype=torch.float)
+            if mode == 'NILM':
+                # TODO
+                data_y = torch.tensor(transformed_x_y.iloc[:, [-1]].values,
+                                      device='cuda:0',
+                                      dtype=torch.float)
+            elif mode == 'forecast':
+                data_y = torch.tensor(transformed_x_y.iloc[:, -2:].values,
+                                      device='cuda:0',
+                                      dtype=torch.float)
+            else:
+                raise Exception
+
+            transformed_x_y.index = other_var_transformed.index
+            return data_x, data_y, transformed_x_y
+
+        def _get_transform_args(self, file_path: Path) -> pd.DataFrame:
+            """
+            根据self.weather_var, self.main_var, self.appliance_var，载入 OR 计算并保存min-max变换需要的参数
+            """
+            if not file_path:
+                raise Exception('Should specify file_path')
+
+            @load_exist_pkl_file_otherwise_run_and_save(file_path)
+            def func() -> pd.DataFrame:
+                transform_args = pd.DataFrame(index=('minimum', 'maximum'),
+                                              columns=self.data.columns)
+                for i in transform_args.columns:
+                    transform_args[i] = (np.nanmin(self.data[i].values), np.nanmax(self.data[i].values))
+                return transform_args
+
+            return func()
+
+
+    class NILMTorchDatasetForecast(NILMTorchDataset):
+        def __init__(self, data: pd.DataFrame,
+                     *, country,
+                     sequence_length: int,
+                     over_lapping: Union[bool, int] = False,
+                     transform_args_file_path: Path,
+                     number_of_previous_days_used_in_input: int = 21):
+            super(NILMTorchDatasetForecast, self).__init__(
+                data,
+                country=country,
+                sequence_length=sequence_length,
+                over_lapping=over_lapping,
+                transform_args_file_path=transform_args_file_path
+            )
+            self.number_of_previous_days_used_in_input = number_of_previous_days_used_in_input
+
+        def __len__(self):
+            return int(self.data.__len__() / self.sequence_length) - self.number_of_previous_days_used_in_input - 1
+
+        def __getitem__(self, index: int):
+            # TODO time_variable_dim_number和weather_variable_dim_number泛化
+            time_variable_dim_number = 6
+            weather_variable_dim_number = 3
+            # 决定索引的位置
+            # index_slice_x = slice(index * self.sequence_length, (index + 7) * self.sequence_length)
+            # index_slice_y = slice((index + 7) * self.sequence_length, (index + 8) * self.sequence_length)
+            # TODO 泛化输入的维度，sa又要对比考虑/不考虑HEP in the input...好无聊啊
+            data_x = torch.zeros(
+                (self.sequence_length,
+                 self.transformed_data[0][index].shape[
+                     0] + self.number_of_previous_days_used_in_input - 1 + self.number_of_previous_days_used_in_input),
+                device='cuda:0'
+            )
+            # Use d=d0's time information
+            index_tuple = (index + self.number_of_previous_days_used_in_input,
+                           index + self.number_of_previous_days_used_in_input + 1)
+            day_slice = slice(
+                index_tuple[0] * self.sequence_length, index_tuple[1] * self.sequence_length
+            )
+            dim_slice = slice(
+                0, time_variable_dim_number
+            )
+            data_x[:, :time_variable_dim_number] = self.transformed_data[0][day_slice, dim_slice]
+            # Use d=(d0-1)'s weather information
+            index_tuple = (index + self.number_of_previous_days_used_in_input - 1,
+                           index + self.number_of_previous_days_used_in_input)
+            day_slice = slice(
+                index_tuple[0] * self.sequence_length, index_tuple[1] * self.sequence_length
+            )
+            dim_slice = slice(
+                time_variable_dim_number, time_variable_dim_number + weather_variable_dim_number
+            )
+            data_x[:, time_variable_dim_number:time_variable_dim_number + weather_variable_dim_number] = \
+                self.transformed_data[0][day_slice, dim_slice]
+            # Use d=(d0-1)'s, (d0-2)'s, ..., (d0-7)'s total load information
+            for i in range(self.number_of_previous_days_used_in_input):
+                index_tuple = (index + self.number_of_previous_days_used_in_input - 1 - i,
+                               index + self.number_of_previous_days_used_in_input - i)
+                day_slice = slice(
+                    index_tuple[0] * self.sequence_length, index_tuple[1] * self.sequence_length
+                )
+                data_x[:, time_variable_dim_number + weather_variable_dim_number + i] = \
+                    self.transformed_data[0][day_slice, -2]
+                # TODO 泛化输入的维度，sa又要对比考虑/不考虑HEP in the input...好无聊啊
+                data_x[:, time_variable_dim_number + weather_variable_dim_number + i + 21] = \
+                    self.transformed_data[0][day_slice, -1]
+
+            index_slice_y = slice((index + self.number_of_previous_days_used_in_input) * self.sequence_length,
+                                  (index + self.number_of_previous_days_used_in_input + 1) * self.sequence_length)
+
+            data_y = self.transformed_data[1][index_slice_y]  # type: torch.tensor
+            return data_x, data_y
+
+        def get_raw_data(self, index):
+            index_slice_y = slice((index + self.number_of_previous_days_used_in_input) * self.sequence_length,
+                                  (index + self.number_of_previous_days_used_in_input + 1) * self.sequence_length)
+            return self.transformed_data[2][slice(
+                index * self.sequence_length,
+                (index + self.number_of_previous_days_used_in_input) * self.sequence_length
+            )], self.transformed_data[2][index_slice_y]
+
+        def _transform(self, transform_args_file_path, mode='forecast') \
+                -> Tuple[torch.tensor, torch.tensor, pd.DataFrame]:
+            return super(NILMTorchDatasetForecast, self)._transform(transform_args_file_path, mode='forecast')
+
+
+except ModuleNotFoundError:
+    pass
 
 DATASET_ROOT_DIRECTORY = r'E:\OneDrive_Extra\Database\Load_Disaggregation'
-LOW_CARBON_LONDON_ROOT = r'C:\Users\SoapClancy\OneDrive\PhD\01-PhDProject\Database\UK Power Networks'
+LOW_CARBON_LONDON_ROOT = fr'C:\Users\{getpass.getuser()}\OneDrive\PhD\01-PhDProject\Database\UK Power Networks'
+TURKEY_ROOT_DIRECTORY = project_path_ / r'Data\Raw\Sasa_Turkey'
 
 
 def load_low_carbon_london_heat(this_no, df_name: str):
@@ -244,7 +482,7 @@ def load_datasets():
     return _ampds2_dataset, _refit_dataset, _uk_dale_dataset
 
 
-def get_training_set_and_test_set_for_ampds2_dataset() -> Tuple[MeterGroup, MeterGroup, MeterGroup]:
+def get_training_set_and_test_set_for_ampds2_dataset():
     """
     从ampds2_dataset中分离出training set和test set，
     只考虑building 1
@@ -270,159 +508,61 @@ def ampds2_dataset_full_df(resolution: int) -> pd.DataFrame:
     """
     ampds2_dataset的heat，main，和对应的气象，和对应的时间
     """
-    _, _, ampds2 = get_training_set_and_test_set_for_ampds2_dataset()
-    heating_df = next(ampds2.select_using_appliances(
-        original_name='HPE').meters[0].load(ac_type='active', sample_period=resolution))
-    heating_df = heating_df.droplevel('physical_quantity', axis=1)  # type: DataFrame
-    heating_df.rename(columns={'active': 'HPE'}, inplace=True)
 
-    mains_df = next(ampds2.mains().load(
-        ac_type='active', sample_period=resolution)).droplevel('physical_quantity', axis=1)  # type: DataFrame
-    mains_df.rename(columns={mains_df.columns[0]: 'Mains'}, inplace=True)
+    @load_exist_pkl_file_otherwise_run_and_save(project_path_ / r'Data\Raw\for_Energies_Research_paper_2020\Ampds2.pkl')
+    def func():
+        _, _, ampds2 = get_training_set_and_test_set_for_ampds2_dataset()
+        heating_df = next(ampds2.select_using_appliances(
+            original_name='HPE').meters[0].load(ac_type='active', sample_period=resolution))
+        heating_df = heating_df.droplevel('physical_quantity', axis=1)  # type: DataFrame
+        heating_df.rename(columns={'active': 'HPE'}, inplace=True)
 
-    ampds2_weather_df = load_ampds2_weather()
-    mains_weather_df_merged = merge_two_time_series_df(mains_df, ampds2_weather_df)
-    mains_weather_df_merged = mains_weather_df_merged.reindex(columns=mains_weather_df_merged.columns[1:].append(
-        mains_weather_df_merged.columns[slice(1)]))
+        mains_df = next(ampds2.mains().load(
+            ac_type='active', sample_period=resolution)).droplevel('physical_quantity', axis=1)  # type: DataFrame
+        mains_df.rename(columns={mains_df.columns[0]: 'Mains'}, inplace=True)
 
-    full_data_df = pd.concat((mains_weather_df_merged, heating_df), axis=1)
+        ampds2_weather_df = load_ampds2_weather()
+        mains_weather_df_merged = merge_two_time_series_df(mains_df, ampds2_weather_df)
+        mains_weather_df_merged = mains_weather_df_merged.reindex(columns=mains_weather_df_merged.columns[1:].append(
+            mains_weather_df_merged.columns[slice(1)]))
 
-    full_data_df['year'] = full_data_df.index.year
-    full_data_df['month'] = full_data_df.index.month
-    full_data_df['day'] = full_data_df.index.day
-    full_data_df['dayofweek'] = full_data_df.index.dayofweek + 1
-    full_data_df['hour'] = full_data_df.index.hour
-    full_data_df['minute'] = full_data_df.index.minute
-    full_data_df['moon_phase'] = moon_phase(full_data_df.index.to_numpy())
-    date_time_one_hot_encoder = DatetimeOnehotEncoder(to_encoding_args=('holiday', 'summer_time'))
-    time_var_transformed = date_time_one_hot_encoder(full_data_df.index,
-                                                     country=Canada())
-    full_data_df['holiday'] = np.array(time_var_transformed.iloc[:, 0] == 0, dtype=int)
-    full_data_df['summer_time'] = np.array(time_var_transformed.iloc[:, 2] == 1, dtype=int)
-    return full_data_df
+        full_data_df = pd.concat((mains_weather_df_merged, heating_df), axis=1)
 
+        # WARNING: full_data_df.index is not used! because stupid Pandas force to have DST transformation, causing two
+        # 1.00 am problem, despite that the original datetime has already been taken care of!
+        # full_data_df['index_index'] = range(full_data_df.shape[0]) # This line is for debug
+        # index_source = full_data_df.index # This line is to use full_data_df.index
+        index_source = pd.DatetimeIndex(pd.date_range(
+            start=datetime.datetime(year=full_data_df.index[0].year,
+                                    month=full_data_df.index[0].month,
+                                    day=full_data_df.index[0].day,
+                                    hour=full_data_df.index[0].hour,
+                                    minute=full_data_df.index[0].minute),
+            end=datetime.datetime(year=full_data_df.index[-1].year,
+                                  month=full_data_df.index[-1].month,
+                                  day=full_data_df.index[-1].day,
+                                  hour=full_data_df.index[-1].hour,
+                                  minute=full_data_df.index[-1].minute),
+            freq=full_data_df.index.freq)
+        )
+        full_data_df['year'] = index_source.year
+        full_data_df['month'] = index_source.month
+        full_data_df['day'] = index_source.day
+        full_data_df['dayofweek'] = index_source.dayofweek + 1
+        full_data_df['hour'] = index_source.hour
+        full_data_df['minute'] = index_source.minute
+        full_data_df['moon_phase'] = moon_phase(full_data_df.index.to_numpy())  # Moon phase must use full_data_df.index
+        date_time_one_hot_encoder = DatetimeOnehotORCircularEncoder(to_encoding_args=('holiday', 'summer_time'))
+        time_var_transformed = date_time_one_hot_encoder(
+            # 'holiday' and 'summer_time' must use full_data_df.index
+            full_data_df.index,
+            country=Canada()
+        )
+        full_data_df['holiday'] = np.array(time_var_transformed.iloc[:, 0] == 1, dtype=int)
+        full_data_df['summer_time'] = np.array(time_var_transformed.iloc[:, 1] == 1, dtype=int)
+        return full_data_df
 
-class NILMTorchDataset(TorchDataSet):
-    """
-    专门针对PyTorch的模型的Dataset
-    """
-    __slots__ = ('data', 'transformed_data', 'sequence_length', 'over_lapping', 'country')
-
-    def __init__(self, data: pd.DataFrame,
-                 *, country,
-                 sequence_length: int,
-                 over_lapping: Union[bool, int] = False,
-                 transform_args_file_path: Path,
-                 ):
-        """
-        :param data 所有数据，包括x和y，形如下面的一个pd.DataFrame
-                           temperature  solar irradiation   precipitation   air density   mains_var   appliance_var
-        time_stamp_index
-        .
-        .
-        .
-        TODO: solar
-        transform_args: 形如下面的一个pd.DataFrame
-                  temperature  solar irradiation   precipitation   air density   mains_var   appliance_var
-
-        minimum
-        maximum
-        :param transform_args_file_path
-        """
-        self.data = data  # type: pd.DataFrame
-        self.sequence_length = sequence_length  # type: int
-        self.over_lapping = over_lapping
-        self.country = country
-        # 最后进行transform
-        self.transformed_data = self._transform(transform_args_file_path)  # type: Tuple[torch.tensor, torch.tensor]
-
-    def __len__(self):
-        if self.over_lapping:
-            return self.data.__len__() - self.sequence_length + 1
-        else:
-            return int(self.data.__len__() / self.sequence_length)
-
-    def __getitem__(self, index: int):
-        # 决定索引的位置
-        if self.over_lapping:
-            index_slice = slice(index, index + self.sequence_length)
-        else:
-            index_slice = slice(index * self.sequence_length, (index + 1) * self.sequence_length)
-        data_x = self.transformed_data[0][index_slice]  # type: torch.tensor
-        data_y = self.transformed_data[1][index_slice]  # type: torch.tensor
-        return data_x, data_y
-
-    def _transform(self, transform_args_file_path, mode='NILM') -> Tuple[torch.tensor, torch.tensor]:
-        # 时间变量
-        # datetime_onehot_encoder = DatetimeOnehotEncoder(to_encoding_args=('month',
-        #                                                                   'weekday',
-        #                                                                   'holiday',
-        #                                                                   'hour',
-        #                                                                   'minute'))
-        datetime_onehot_encoder = DatetimeOnehotEncoder(to_encoding_args=('month',
-                                                                          'weekday',
-                                                                          'holiday',
-                                                                          'summer_time'))
-        time_var_transformed = datetime_onehot_encoder(self.data.index,
-                                                       country=self.country)
-        # 其它
-        transform_args = self._get_transform_args(transform_args_file_path)
-        other_var_transformed = pd.DataFrame(columns=transform_args.columns)
-        for this_col in transform_args.columns:
-            other_var_transformed.loc[:, this_col] = (self.data.loc[:, this_col] -
-                                                      transform_args.loc['minimum', this_col]) / (
-                                                             transform_args.loc['maximum', this_col] -
-                                                             transform_args.loc['minimum', this_col])
-        transformed_x_y = pd.concat(
-            (time_var_transformed, other_var_transformed.reset_index().drop('TIMESTAMP', axis=1)), axis=1)
-        data_x = torch.tensor(transformed_x_y.iloc[:, :-1].values,
-                              device='cuda:0',
-                              dtype=torch.float)
-        if mode == 'NILM':
-            data_y = torch.tensor(transformed_x_y.iloc[:, [-1]].values,
-                                  device='cuda:0',
-                                  dtype=torch.float)
-        elif mode == 'forecast':
-            data_y = torch.tensor(transformed_x_y.iloc[:, -2:].values,
-                                  device='cuda:0',
-                                  dtype=torch.float)
-        else:
-            raise Exception
-        return data_x, data_y
-
-    def _get_transform_args(self, file_path: Path) -> pd.DataFrame:
-        """
-        根据self.weather_var, self.main_var, self.appliance_var，载入 OR 计算并保存min-max变换需要的参数
-        """
-        if not file_path:
-            raise Exception('Should specify file_path')
-
-        @load_exist_pkl_file_otherwise_run_and_save(file_path)
-        def func() -> pd.DataFrame:
-            transform_args = pd.DataFrame(index=('minimum', 'maximum'),
-                                          columns=self.data.columns)
-            for i in transform_args.columns:
-                transform_args[i] = (np.nanmin(self.data[i].values), np.nanmax(self.data[i].values))
-            return transform_args
-
-        return func()
-
-
-class NILMTorchDatasetForecast(NILMTorchDataset):
-
-    def __len__(self):
-        return int(self.data.__len__() / self.sequence_length) - 7
-
-    def __getitem__(self, index: int):
-        # 决定索引的位置
-        index_slice_x = slice(index * self.sequence_length, (index + 7) * self.sequence_length)
-        index_slice_y = slice((index + 7) * self.sequence_length, (index + 8) * self.sequence_length)
-        data_x = self.transformed_data[0][index_slice_x]  # type: torch.tensor
-        data_y = self.transformed_data[1][index_slice_y]  # type: torch.tensor
-        return data_x, data_y
-
-    def _transform(self, transform_args_file_path, mode='forecast') -> Tuple[torch.tensor, torch.tensor]:
-        return super(NILMTorchDatasetForecast, self)._transform(transform_args_file_path, mode='forecast')
+    return func()
 
 
 class ScotlandDataset(metaclass=ABCMeta):
@@ -561,12 +701,106 @@ class ScotlandShorterDataset(ScotlandDataset):
         return loadmat(self.matlab_mat_file_folder / 'Data_temperature.mat')['temperature'].flatten()
 
 
+def load_turkey_dataset():
+    @load_exist_pkl_file_otherwise_run_and_save(project_path_ / r'Data\Raw\for_Energies_Research_paper_2020\Turkey.pkl')
+    def func():
+        turkey_data = {}
+        for file_prefix in ('Apartment', 'Detached House'):
+            # %% read mains and lighting
+            one_excel_reading = pd.read_excel(TURKEY_ROOT_DIRECTORY / f'{file_prefix} Meter Data.xlsx',
+                                              sheet_name=None)  # type: dict
+
+            reading_df = pd.DataFrame()
+            for i, (key, val) in enumerate(one_excel_reading.items()):
+                if ('Main' not in key) and ('Lighting' not in key):
+                    continue
+                datetime_index = pd.DatetimeIndex(pd.to_datetime(val.values[:, 0]))
+                this_sheet_df = pd.DataFrame(data=val['Active'].values,
+                                             index=datetime_index.round('H'),
+                                             columns=['main' if 'Main' in key else 'lighting']).sort_index()
+                this_sheet_df = this_sheet_df[~this_sheet_df.index.duplicated(keep='first')]
+                if i == 0:
+                    reading_df = this_sheet_df
+                else:
+                    reading_df = pd.merge(reading_df, this_sheet_df, left_index=True, right_index=True, how='outer')
+            reading_df = reading_df.diff()
+
+            # %% Weather
+            weather_df = pd.DataFrame()
+            for i, year in enumerate((2017, 2018)):
+                this_weather_df = pd.read_csv(TURKEY_ROOT_DIRECTORY / f'{file_prefix}_MERRA_II_{year}.csv',
+                                              skiprows=3)
+                this_weather_df.index = pd.DatetimeIndex(pd.to_datetime(this_weather_df['local_time'].values))
+                this_weather_df = this_weather_df.iloc[:, 2:]
+                if i == 0:
+                    weather_df = this_weather_df
+                else:
+                    weather_df = pd.concat((weather_df, this_weather_df))  # type: pd.DataFrame
+
+            # %% Merge
+            merged_reading = pd.merge(reading_df, weather_df, left_index=True, right_index=True, how='left')
+            #
+            turkey_data[file_prefix] = merged_reading
+        return turkey_data
+
+    return func()
+
+
+def pre_call_():
+    """
+    This is to save the followings to pd.DataFrame format:
+    - Ampds 2, main, heat, weather
+    - UKDale
+    Please call this function in NILM_Project conda env, as Python_Project conda env has very latest packages that
+    nilmtk does not support!
+    In the actual analysis, Python_Project should be used.
+    The only reason NILM_Project exists is to transform the required data (especially for Energies_Research_paper_2020)
+    to pd.DataFrame.
+    """
+    sample_period = 3600
+    # %% Ampds2
+    ampds2_dataset_full_df(sample_period)
+
+    # %% UK Dale
+    @load_exist_pkl_file_otherwise_run_and_save(project_path_ / r'Data\Raw\for_Energies_Research_paper_2020\UKDALE.pkl')
+    def func():
+        _, _, uk_dale = load_datasets()
+
+        uk_dale_lighting = next(uk_dale.buildings[1].elec.select_using_appliances(category='lighting').load(
+            sample_period=sample_period))[('power', 'active')]
+        uk_dale_heating = next(uk_dale.buildings[1].elec.select_using_appliances(category='heating').load(
+            sample_period=sample_period))[('power', 'active')]
+        uk_dale_mains = uk_dale.buildings[1].elec.mains().power_series_all_data(sample_period=sample_period)
+
+        uk_dale_df = pd.DataFrame()
+        names = ('lighting', 'heating', 'mains')
+        for i, this_df in enumerate((uk_dale_lighting, uk_dale_heating, uk_dale_mains)):
+            this_df = this_df[~this_df.index.duplicated(keep='first')]
+            this_df = pd.DataFrame(data=this_df.values,
+                                   index=this_df.index,
+                                   columns=[names[i]])
+            if i == 0:
+                uk_dale_df = this_df
+            else:
+                uk_dale_df = pd.merge(uk_dale_df,
+                                      this_df, left_index=True, right_index=True, how='outer')
+        return uk_dale_df
+
+    func()
+
+
 if __name__ == '__main__':
     # ampds2_dataset, refit_dataset, uk_dale_dataset = load_datasets()
     # get_training_set_and_test_set_for_ampds2_dataset()
     # John_data = ScotlandLongerDataset('John')
     # John_data.set_weekends_and_holiday_to_zeros()
-    for _this_no in (1, 2, 3, 4, 5, 7):
-        for this_type in ('heat', 'electric', 'electric and heat'):
-            load_low_carbon_london_heat(_this_no, this_type)
+    # for _this_no in (1, 2, 3, 4, 5, 7):
+    #     for this_type in ('heat', 'electric', 'electric and heat'):
+    #         load_low_carbon_london_heat(_this_no, this_type)
     # load_ampds2_weather()
+    # ampds2_dataset_full_df(30 * 60)
+
+    # %% Execute in NILM_Project, preparing
+    pre_call_()
+
+    # %% Test codes

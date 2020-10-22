@@ -7,11 +7,11 @@ from matplotlib import pyplot as plt
 from Ploting.adjust_Func import reassign_linestyles_recursively_in_ax, adjust_legend_in_ax
 from Ploting.fast_plot_Func import series, time_series, scatter
 from dateutil import tz
-from project_path_Var import project_path_
+from project_utils import project_path_
 import os
 from TimeSeries_Class import merge_two_time_series_df
 from FFT_Class import FFTProcessor, STFTProcessor
-from Time_Processing.datetime_utils import DatetimeOnehotEncoder
+from Time_Processing.datetime_utils import DatetimeOnehotORCircularEncoder
 from workalendar.america import Canada
 from TimeSeries_Class import UnivariateTimeSeries, TimeSeries, WindowedTimeSeries
 from pathlib import Path
@@ -197,7 +197,7 @@ def energies_paper_fft_for_ampds2_dataset(sample_period):
     #     save_format='png')
 
     # 将holiday和weekends置为zeros
-    datetime_onehot_encoder = DatetimeOnehotEncoder(to_encoding_args=('holiday', 'weekday'))
+    datetime_onehot_encoder = DatetimeOnehotORCircularEncoder(to_encoding_args=('holiday', 'weekday'))
     time_var_transformed = datetime_onehot_encoder(mains.data.index,
                                                    country=Canada())
     mask = np.any((time_var_transformed[('holiday', 1)] == 1,
