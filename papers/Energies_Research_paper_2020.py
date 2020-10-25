@@ -12,7 +12,12 @@ from PhysicalInstance_Class import *
 from FFT_Class import FFTProcessor, LASSOFFTProcessor
 from Time_Processing.format_convert_Func import np_datetime64_to_datetime
 from locale import setlocale, LC_ALL
-from Writting import docx_document_template_to_collect_figures
+from Writting import *
+from tqdm import tqdm
+from prepare_datasets import NILMDataSet, ampds2_dataset_full_df
+import tensorflow as tf
+from tensorflow import keras
+from tensorflow.keras.layers import LSTM
 
 setlocale(LC_ALL, "en_US")
 
@@ -56,45 +61,29 @@ UKDALE_DATA = PhysicalInstanceDataFrame(load_pkl_file(raw_data_path / 'UKDALE.pk
                                         obj_name='UK DALE', predictor_names=(), dependant_names=())
 
 
-def lasso_fft_and_correlation(task='explore'):
+def lasso_fft_and_correlation(task='explore', *, data_set, save_to_buffer=True):
     assert task in ('explore', 'load results')
-
-
-if __name__ == '__main__':
-    this_data_set = copy.deepcopy(AMPDS2_DATA)
-    this_data_set = this_data_set.iloc[24 * 185:24 * 187]
-    save_to_buffer = True
+    this_data_set = copy.deepcopy(data_set)
+    # this_data_set = this_data_set.iloc[24 * 185:24 * 190 - 1]
     # Reindex to make sure it's index is has equal diff
     tz = this_data_set.index.__getattribute__('tz')
     first_index, last_index = this_data_set.index[0], this_data_set.index[-1]
-    this_data_set_freq = np.min(np.diff(this_data_set.index))
+    this_data_set_freq = int(np.min(np.diff(this_data_set.index)) / np.timedelta64(1, 's'))
     this_data_set = this_data_set.reindex(pd.DatetimeIndex(
         pd.date_range(
             start=datetime.datetime(first_index.year, first_index.month, first_index.day),
             end=datetime.datetime(last_index.year, last_index.month, last_index.day) + datetime.timedelta(1),
-            freq=this_data_set_freq,
+            freq=f"{this_data_set_freq}S",
             tz=tz
         )
     ))
     # %% window length = 1D
-    main_plot_list = []
-    appliance_plot_list = []
-    environment_plot_list = []
-    lasso_fft_plot_list = []
-    final_correlation_plot_list = []
-    this_data_set_iter = iter(WindowedTimeSeries(this_data_set, window_length=datetime.timedelta(days=1)))
     document = docx_document_template_to_collect_figures()
-    for i, this_window_data in enumerate(this_data_set_iter):
-        x_axis_value = [np_datetime64_to_datetime(x, tz=tz) for x in this_window_data.index.values]
+    for i, this_window_data in enumerate(
+            tqdm(WindowedTimeSeries(this_data_set, window_length=datetime.timedelta(days=1)))):
 
-        # %% Obtain the required dimensions of data
-        # Main
-        main = this_window_data['main']
-        main_plot = time_series(x=x_axis_value, y=main.values, tz=tz,
-                                y_label='Main Active Power [W]', **TIME_SERIES_PLOT_KWARGS,
-                                save_to_buffer=save_to_buffer)
-        main_plot_list.append(main_plot)
-
+        if this_window_data.size == 0:
+            continue
         # depending on the dataset, heating or lighting will be analysed
         # Turkey data set only analyses lighting
         if 'Turkey' in this_data_set.obj_name:
@@ -110,6 +99,17 @@ if __name__ == '__main__':
 
             environment_name = 'environmental temperature'
             environment_plot_y_label = 'Environmental Temperature [\u00B0C]'
+        if np.any(np.isnan(this_window_data[['main', appliance_name, environment_name]])):
+            continue
+
+        x_axis_value = [np_datetime64_to_datetime(x, tz=tz) for x in this_window_data.index.values]
+
+        # %% Obtain the required dimensions of data
+        # Main
+        main = this_window_data['main']
+        main_plot = time_series(x=x_axis_value, y=main.values, tz=tz,
+                                y_label='Main Active Power [W]', **TIME_SERIES_PLOT_KWARGS,
+                                save_to_buffer=save_to_buffer)
 
         appliance = this_window_data[appliance_name]
         environment = this_window_data[environment_name]
@@ -117,20 +117,18 @@ if __name__ == '__main__':
         appliance_plot = time_series(x=x_axis_value, y=appliance.values, tz=tz,
                                      y_label=appliance_plot_y_label, **TIME_SERIES_PLOT_KWARGS,
                                      save_to_buffer=save_to_buffer)
-        appliance_plot_list.append(appliance_plot)
         environment_plot = time_series(x=x_axis_value, y=environment.values, tz=tz,
                                        y_label=environment_plot_y_label, **TIME_SERIES_PLOT_KWARGS,
                                        save_to_buffer=save_to_buffer)
-        environment_plot_list.append(environment_plot)
 
         # %% LASSO-FFT and Correlation
         b_fft_correlation = BivariateFFTCorrelation(
-            n_fft=2 ** 20,
+            n_fft=2 ** 22,
             considered_frequency_unit='1/half day',
             _time_series=this_window_data[[environment_name, 'main']],
             correlation_func=('Spearman',),
-            main_considered_peaks_index=list(range(1, 7)),
-            vice_considered_peaks_index=list(range(1, 7)),
+            main_considered_peaks_index=list(range(1, 8)),
+            vice_considered_peaks_index=list(range(1, 8)),
             vice_find_peaks_args={
                 'scipy_signal_find_peaks_args': {
 
@@ -145,7 +143,6 @@ if __name__ == '__main__':
             )
 
         lasso_fft_plot = lasso_fft_obj.plot('1/half day', save_to_buffer=save_to_buffer)
-        lasso_fft_plot_list.append(lasso_fft_plot)
         """
         DEBUG
         """
@@ -154,23 +151,69 @@ if __name__ == '__main__':
         # series(environment, title='environment')
         # series(final_correlation_results['Spearman'][-1].partly_combination_reconstructed,
         #        title='weired')
-        # FFTProcessor(n_fft=2 ** 18, original_signal=main.values, sampling_period=this_data_set_freq.seconds,
+        # FFTProcessor(n_fft=2 ** 18, original_signal=main.values, sampling_period=this_data_set_freq,
         #              name='test').plot(considered_frequency_units='1/half day',
         #                                overridden_plot_x_lim=ax[0].get_xlim(), plot_log=True)
 
         final_correlation_reconstructed = final_correlation_results['Spearman'][-1].partly_combination_reconstructed
         final_correlation_plot = time_series(
             x=x_axis_value, y=final_correlation_reconstructed, tz=tz,
-            y_label=f"Components of Main \n(Most Negatively Correlated with\n{environment_name.title()}) [W]",
+            y_label=f"Components of Main (Most\nNegatively Correlated with\n{environment_name.title()}) [W]",
             **TIME_SERIES_PLOT_KWARGS,
             save_to_buffer=save_to_buffer
         )
-        final_correlation_plot_list.append(final_correlation_plot)
-    # Writing
-    for i, (main_plot, appliance_plot, environment_plot, lasso_fft_plot_list, final_correlation_plot) in enumerate(
-            zip((main_plot_list,
-                 appliance_plot_list,
-                 environment_plot_list,
-                 lasso_fft_plot_list,
-                 final_correlation_plot_list,))):
-        pass
+
+        # Writing
+        if save_to_buffer:
+            document.add_heading(x_axis_value[0].strftime('%y-%b-%d %a'), level=1)
+            for this_plot in (main_plot, appliance_plot, environment_plot):
+                p = document.add_paragraph()
+                p.add_run().add_picture(this_plot, width=Cm(14))
+            p = document.add_paragraph()
+            p.add_run().add_picture(lasso_fft_plot[0], width=Cm(7))
+            p.add_run().add_picture(lasso_fft_plot[1], width=Cm(7))
+            p = document.add_paragraph()
+            p.add_run().add_picture(final_correlation_plot, width=Cm(14))
+            document.add_page_break()
+    document.save(f'.\\{this_data_set.obj_name}_lasso_fft_and_corr.docx')
+
+
+def load_ampds2_data_set(resolution: int, mode: str = 'training'):
+    assert mode in ('training', 'test')
+    ampds2_dataset = ampds2_dataset_full_df(resolution=resolution)
+    if mode == 'training':
+        _slice = slice(0, int(len(ampds2_dataset) / 2))
+    else:
+        _slice = slice(int(len(ampds2_dataset) / 2), len(ampds2_dataset) + 1)
+
+    ampds2_training = NILMDataSet(ampds2_dataset.iloc[_slice],
+                                  name=f'ampds2_{mode}',
+                                  cos_sin_transformed_col=('month',),
+                                  one_hot_transformed_col=('dayofweek',),
+                                  non_transformed_col=('summer_time', 'holiday'),
+                                  min_max_transformed_col=('moon_phase', 'Temp (C)', 'Rel Hum (%)', 'Stn Press (kPa)',
+                                                           'Mains', 'HPE'),
+                                  dependant_cols=('HPE',))
+
+    # ampds2_training.windowed_dataset(datetime.timedelta(days=1), batch_size=10)
+    return ampds2_training
+
+
+def model_layout(input_shape, output_dim):
+    model = tf.keras.models.Sequential([
+        tf.keras.layers.Conv1D(filters=32, kernel_size=3,
+                               strides=1, padding="causal",
+                               activation="relu",
+                               input_shape=input_shape),
+        tf.keras.layers.Bidirectional(LSTM(64, return_sequences=True)),
+        tf.keras.layers.Bidirectional(LSTM(128, return_sequences=True)),
+        tf.keras.layers.Dense(30, activation="relu"),
+        tf.keras.layers.Dense(10, activation="relu"),
+        tf.keras.layers.Dense(output_dim),
+    ])
+
+    return model
+
+
+if __name__ == '__main__':
+    lasso_fft_and_correlation(task='explore', data_set=AMPDS2_DATA)

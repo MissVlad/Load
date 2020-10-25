@@ -4,7 +4,7 @@ from abc import ABCMeta, abstractmethod
 from pathlib import Path
 from typing import Tuple
 import pandas as pd
-
+from itertools import chain
 from scipy.io import loadmat
 from File_Management.load_save_Func import *
 from File_Management.path_and_file_management_Func import *
@@ -17,6 +17,11 @@ import getpass
 from dateutil import tz
 from pandas import DataFrame
 from Time_Processing.datetime_utils import DatetimeOnehotORCircularEncoder
+from sklearn.preprocessing import MinMaxScaler, OneHotEncoder
+from Data_Preprocessing.TruncatedOrCircularToLinear_Class import CircularToLinear
+from tensorflow.keras.utils import to_categorical
+from functools import reduce
+import math
 
 try:
     from nilmtk import DataSet, MeterGroup
@@ -35,6 +40,7 @@ try:
     from docx.enum.text import WD_BREAK
     from workalendar.america import Canada
     from pyorbital.moon_phase import moon_phase
+    import tensorflow as tf
 
 
     class NILMTorchDataset(TorchDataSet):
@@ -509,7 +515,8 @@ def ampds2_dataset_full_df(resolution: int) -> pd.DataFrame:
     ampds2_dataset的heat，main，和对应的气象，和对应的时间
     """
 
-    @load_exist_pkl_file_otherwise_run_and_save(project_path_ / r'Data\Raw\for_Energies_Research_paper_2020\Ampds2.pkl')
+    @load_exist_pkl_file_otherwise_run_and_save(
+        project_path_ / fr'Data\Raw\for_Energies_Research_paper_2020\Ampds2_resolution_{resolution}.pkl')
     def func():
         _, _, ampds2 = get_training_set_and_test_set_for_ampds2_dataset()
         heating_df = next(ampds2.select_using_appliances(
@@ -555,7 +562,7 @@ def ampds2_dataset_full_df(resolution: int) -> pd.DataFrame:
         date_time_one_hot_encoder = DatetimeOnehotORCircularEncoder(to_encoding_args=('holiday', 'summer_time'))
         time_var_transformed = date_time_one_hot_encoder(
             # 'holiday' and 'summer_time' must use full_data_df.index
-            full_data_df.index,
+            full_data_df.__getattribute__('index'),
             country=Canada()
         )
         full_data_df['holiday'] = np.array(time_var_transformed.iloc[:, 0] == 1, dtype=int)
@@ -789,7 +796,162 @@ def pre_call_():
     func()
 
 
+class NILMDataSet:
+    __slots__ = ('data', 'name', 'transformed_cols_meta', 'transformed_data', 'predictor_cols', 'dependant_cols')
+
+    def __init__(self, original_data_set: pd.DataFrame, *,
+                 name: str,
+                 cos_sin_transformed_col: Tuple[str, ...] = None,
+                 min_max_transformed_col: Tuple[str, ...] = None,
+                 one_hot_transformed_col: Tuple[str, ...] = None,
+                 non_transformed_col: Tuple[str, ...] = None,
+                 predictor_cols: Tuple[str, ...] = None,
+                 dependant_cols: Tuple[str, ...] = None,
+                 transformation_args_path: Path = None):
+        assert ('training' in name) or ('test' in name)
+        assert (predictor_cols or dependant_cols) is not None
+        assert not ((predictor_cols is not None) and (dependant_cols is not None))
+
+        self.data = original_data_set  # type: pd.DataFrame
+        self.name = name
+        self.transformed_cols_meta = {
+            'cos_sin_transformed_col': cos_sin_transformed_col,
+            'min_max_transformed_col': min_max_transformed_col,
+            'one_hot_transformed_col': one_hot_transformed_col,
+            'non_transformed_col': non_transformed_col
+        }
+        self.predictor_cols, self.dependant_cols = self._infer_predictor_and_dependant_cols(predictor_cols,
+                                                                                            dependant_cols)
+        self.transformed_data = self._preprocess(transformation_args_path)
+
+    @property
+    def considered_cols_list(self):
+        return list(chain(*self.transformed_cols_meta.values()))
+
+    def _infer_predictor_and_dependant_cols(self, predictor_cols, dependant_cols):
+        if predictor_cols is not None:
+            return predictor_cols, list(set(self.considered_cols_list) - set(predictor_cols))
+        else:
+            return list(set(self.considered_cols_list) - set(dependant_cols)), dependant_cols
+
+    def _preprocess(self, transformation_args_path: Path = None):
+        """
+        This function
+        """
+        name = self.name.replace("test", "training")
+        transformation_args_path = transformation_args_path or (project_path_ / 'Data/Results/Energies_paper/'
+                                                                                'transformation_args' / f"{name}.pkl")
+
+        # %% Obtain the args for transformation
+        @load_exist_pkl_file_otherwise_run_and_save(transformation_args_path)
+        def load_transformation_args_func():
+            _transformed_cols_args = {key: None for key in self.transformed_cols_meta}
+            _new_multi_index_columns = {key: None for key in self.considered_cols_list}
+            # %% min_max_transformed_col
+            min_max_scaler = MinMaxScaler()
+            min_max_scaler.fit(self.data[list(self.transformed_cols_meta['min_max_transformed_col'])].values)
+            _transformed_cols_args['min_max_transformed_col'] = min_max_scaler
+            for this_col in self.transformed_cols_meta['min_max_transformed_col']:
+                _new_multi_index_columns[this_col] = [(this_col, 'min_max')]
+
+            # %% cos_sin_transformed_col
+            cos_sin_transformed_col_args = {key: None for key in self.transformed_cols_meta['cos_sin_transformed_col']}
+            for this_col in self.transformed_cols_meta['cos_sin_transformed_col']:
+                this_col_data = self.data[this_col].values
+                this_col_lower_boundary = np.nanmin(this_col_data)
+                this_col_upper_boundary = np.nanmax(this_col_data)
+                cos_sin_transformed_col_args[this_col] = (this_col_lower_boundary, this_col_upper_boundary)
+                _new_multi_index_columns[this_col] = [(this_col, 'cos'), (this_col, 'sin')]
+            _transformed_cols_args['cos_sin_transformed_col'] = cos_sin_transformed_col_args
+
+            # %% one_hot_transformed_col
+            one_hot_encoder = OneHotEncoder()
+            one_hot_encoder.fit(self.data[list(self.transformed_cols_meta['one_hot_transformed_col'])].values)
+            for i, this_col in enumerate(self.transformed_cols_meta['one_hot_transformed_col']):
+                _new_multi_index_columns[this_col] = [(this_col, f'one_hot_{x}') for x in
+                                                      one_hot_encoder.categories_[i]]
+
+            # %% non_transformed_col
+            for this_col in self.transformed_cols_meta['non_transformed_col']:
+                _new_multi_index_columns[this_col] = [(this_col, 'original')]
+
+            _transformed_cols_args['one_hot_transformed_col'] = one_hot_encoder
+
+            return _transformed_cols_args, _new_multi_index_columns
+
+        transformed_cols_args, new_multi_index_columns = load_transformation_args_func()
+        # %% Do transformation
+        transformed_data = pd.DataFrame(
+            index=self.data.index,
+            columns=pd.MultiIndex.from_tuples(reduce(lambda a, b: a + b, new_multi_index_columns.values()),
+                                              names=('feature', 'notes')),
+            dtype=float
+        )
+        # %% min_max_transformed_col and one_hot_transformed_col
+        for _ in ('min_max_transformed_col', 'one_hot_transformed_col'):
+            _index = list(self.transformed_cols_meta[_])
+            trans = transformed_cols_args[_].transform(self.data[_index])
+            try:
+                transformed_data.loc[:, _index] = trans
+            except IndexError:
+                transformed_data.loc[:, _index] = trans.toarray().astype(int)
+
+        # %% cos_sin_transformed_col
+        _index = list(self.transformed_cols_meta['cos_sin_transformed_col'])
+        for this_index in _index:
+            obj = CircularToLinear(lower_boundary=transformed_cols_args['cos_sin_transformed_col'][this_index][0],
+                                   upper_boundary=transformed_cols_args['cos_sin_transformed_col'][this_index][1],
+                                   period=transformed_cols_args['cos_sin_transformed_col'][this_index][1])
+            trans = obj.transform(self.data[this_index].values)
+            transformed_data.loc[:, (this_index, 'cos')] = trans['cos']
+            transformed_data.loc[:, (this_index, 'sin')] = trans['sin']
+
+        # %% non_transformed_col
+        _index = list(self.transformed_cols_meta['non_transformed_col'])
+        transformed_data.loc[:, _index] = self.data[list(self.transformed_cols_meta['non_transformed_col'])].values
+        return transformed_data
+
+    def windowed_dataset(self, window_length: datetime.timedelta, *,
+                         drop_remainder=False,
+                         batch_size: int,
+                         shift=None) -> tf.data.Dataset:
+        assert np.unique(np.diff(self.transformed_data.index.values)).size == 1
+        freq = (self.transformed_data.index.values[1] - self.transformed_data.index.values[0]) / np.timedelta64(1, 's')
+        window_size = int(window_length.total_seconds() / freq)
+
+        transformed_data_ndarray = self.transformed_data.values
+        predictor_cols_index = list(chain(*[list(self.transformed_data.columns.__getattribute__('get_locs')([x]))
+                                            for x in self.predictor_cols]))
+        dependant_cols_index = list(chain(*[list(self.transformed_data.columns.__getattribute__('get_locs')([x]))
+                                            for x in self.dependant_cols]))
+        predictor_cols_index.sort()
+        dependant_cols_index.sort()
+
+        transformed_data_ndarray = tf.data.Dataset.from_tensor_slices(transformed_data_ndarray)
+        transformed_data_ndarray = transformed_data_ndarray.window(window_size,
+                                                                   shift=shift or window_size,
+                                                                   drop_remainder=drop_remainder)
+        transformed_data_ndarray = transformed_data_ndarray.flat_map(
+            lambda window: window.batch(window_size, drop_remainder=drop_remainder)
+        )
+        transformed_data_ndarray = transformed_data_ndarray.map(
+            lambda window: (tf.gather(window, predictor_cols_index, axis=1),
+                            tf.gather(window, dependant_cols_index, axis=1))
+        )
+        transformed_data_ndarray = transformed_data_ndarray.batch(batch_size).prefetch(1)
+        return transformed_data_ndarray
+
+
 if __name__ == '__main__':
+    # %% Load data sets
+    pass
+    # tt = ampds2_dataset_full_df(600)
+
+
+    # %% Execute in NILM_Project, preparing
+    # pre_call_()
+
+    # %% Test codes
     # ampds2_dataset, refit_dataset, uk_dale_dataset = load_datasets()
     # get_training_set_and_test_set_for_ampds2_dataset()
     # John_data = ScotlandLongerDataset('John')
@@ -799,8 +961,3 @@ if __name__ == '__main__':
     #         load_low_carbon_london_heat(_this_no, this_type)
     # load_ampds2_weather()
     # ampds2_dataset_full_df(30 * 60)
-
-    # %% Execute in NILM_Project, preparing
-    pre_call_()
-
-    # %% Test codes
