@@ -18,6 +18,7 @@ from prepare_datasets import NILMDataSet, ampds2_dataset_full_df
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras.layers import LSTM
+from prepare_datasets import ScotlandLongerDataset
 
 setlocale(LC_ALL, "en_US")
 
@@ -59,6 +60,24 @@ TURKEY_HOUSE_DATA = TURKEY_HOUSE_DATA.rename(
 # UK DALE
 UKDALE_DATA = PhysicalInstanceDataFrame(load_pkl_file(raw_data_path / 'UKDALE.pkl'),
                                         obj_name='UK DALE', predictor_names=(), dependant_names=())
+# JOHN MV
+john_data_set_date_start = datetime.datetime(year=2009, month=1, day=1)
+# john_data_set_date_end = datetime.datetime(year=2009, month=1, day=3)
+john_data_set_date_end = datetime.datetime(year=2010, month=1, day=1)
+JOHN_DATA = ScotlandLongerDataset("John").dataset
+JOHN_DATA = PhysicalInstanceDataFrame(
+    JOHN_DATA[np.bitwise_and(JOHN_DATA.index >= john_data_set_date_start,
+                             JOHN_DATA.index < john_data_set_date_end)],
+    obj_name='John MV', predictor_names=(), dependant_names=()
+)
+JOHN_DATA = JOHN_DATA.rename(
+    {
+        'temperature': 'environmental temperature',
+        'active power': 'main',
+    },
+    axis=1
+)
+JOHN_DATA['heating'] = np.full(JOHN_DATA.shape[0], 0)
 
 
 def lasso_fft_and_correlation(task='explore', *, data_set, save_to_buffer=True):
@@ -79,8 +98,8 @@ def lasso_fft_and_correlation(task='explore', *, data_set, save_to_buffer=True):
     ))
     # %% window length = 1D
     document = docx_document_template_to_collect_figures()
-    for i, this_window_data in enumerate(
-            tqdm(WindowedTimeSeries(this_data_set, window_length=datetime.timedelta(days=1)))):
+    for i, this_window_data in enumerate(tqdm(WindowedTimeSeries(this_data_set,
+                                                                 window_length=datetime.timedelta(days=1)))):
 
         if this_window_data.size == 0:
             continue
@@ -92,7 +111,7 @@ def lasso_fft_and_correlation(task='explore', *, data_set, save_to_buffer=True):
 
             environment_name = 'solar irradiance'
             environment_plot_y_label = r'Solar Irradiance [W/$\mathregular{m}^2$]'
-        # Ampds2 data set only analyses heating
+        # Ampds2 data set only analyses heating, other data sets are funny
         else:
             appliance_name = 'heating'
             appliance_plot_y_label = 'Heating Active Power [W]'
@@ -107,16 +126,25 @@ def lasso_fft_and_correlation(task='explore', *, data_set, save_to_buffer=True):
         # %% Obtain the required dimensions of data
         # Main
         main = this_window_data['main']
-        main_plot = time_series(x=x_axis_value, y=main.values, tz=tz,
-                                y_label='Main Active Power [W]', **TIME_SERIES_PLOT_KWARGS,
-                                save_to_buffer=save_to_buffer)
+        if ('Ampds2' in this_data_set.obj_name) or ('Turkey' in this_data_set.obj_name):
+            y_unit = "W"
+        else:
+            y_unit = "MW"
+        main_plot = time_series(
+            x=x_axis_value, y=main.values, tz=tz,
+            y_label=f"Main Active Power [{y_unit}]",
+            **TIME_SERIES_PLOT_KWARGS, save_to_buffer=save_to_buffer)
 
         appliance = this_window_data[appliance_name]
         environment = this_window_data[environment_name]
 
-        appliance_plot = time_series(x=x_axis_value, y=appliance.values, tz=tz,
-                                     y_label=appliance_plot_y_label, **TIME_SERIES_PLOT_KWARGS,
-                                     save_to_buffer=save_to_buffer)
+        if ("Ampds2" in this_data_set.obj_name) or ("Turkey" in this_data_set.obj_name):
+            appliance_plot = time_series(x=x_axis_value, y=appliance.values, tz=tz,
+                                         y_label=appliance_plot_y_label, **TIME_SERIES_PLOT_KWARGS,
+                                         save_to_buffer=save_to_buffer)
+        else:
+            appliance_plot = None
+
         environment_plot = time_series(x=x_axis_value, y=environment.values, tz=tz,
                                        y_label=environment_plot_y_label, **TIME_SERIES_PLOT_KWARGS,
                                        save_to_buffer=save_to_buffer)
@@ -127,8 +155,8 @@ def lasso_fft_and_correlation(task='explore', *, data_set, save_to_buffer=True):
             considered_frequency_unit='1/half day',
             _time_series=this_window_data[[environment_name, 'main']],
             correlation_func=('Spearman',),
-            main_considered_peaks_index=list(range(1, 8)),
-            vice_considered_peaks_index=list(range(1, 8)),
+            main_considered_peaks_index=list(range(1, 11)),
+            vice_considered_peaks_index=list(range(1, 11)),
             vice_find_peaks_args={
                 'scipy_signal_find_peaks_args': {
 
@@ -143,6 +171,12 @@ def lasso_fft_and_correlation(task='explore', *, data_set, save_to_buffer=True):
             )
 
         lasso_fft_plot = lasso_fft_obj.plot('1/half day', save_to_buffer=save_to_buffer)
+        reconstructed_main_plot = time_series(
+            x=x_axis_value, y=lasso_fft_obj(this_window_data.index)[0], tz=tz,
+            y_label=f"Inverse FFT [{y_unit}]",
+            **TIME_SERIES_PLOT_KWARGS,
+            save_to_buffer=save_to_buffer
+        )
         """
         DEBUG
         """
@@ -166,7 +200,9 @@ def lasso_fft_and_correlation(task='explore', *, data_set, save_to_buffer=True):
         # Writing
         if save_to_buffer:
             document.add_heading(x_axis_value[0].strftime('%y-%b-%d %a'), level=1)
-            for this_plot in (main_plot, appliance_plot, environment_plot):
+            to_plot_list_buffer_list = [main_plot, appliance_plot, environment_plot, reconstructed_main_plot]
+            to_plot_list_buffer_list.remove(None)
+            for this_plot in to_plot_list_buffer_list:
                 p = document.add_paragraph()
                 p.add_run().add_picture(this_plot, width=Cm(14))
             p = document.add_paragraph()
@@ -216,4 +252,5 @@ def model_layout(input_shape, output_dim):
 
 
 if __name__ == '__main__':
-    lasso_fft_and_correlation(task='explore', data_set=AMPDS2_DATA)
+    pass
+    lasso_fft_and_correlation(task='explore', data_set=JOHN_DATA)

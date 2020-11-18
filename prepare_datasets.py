@@ -608,8 +608,8 @@ class ScotlandDataset(metaclass=ABCMeta):
         把节假日或者周末的数据置为0
         :return 置0后的pd.DataFrame和对应的mask
         """
-        mask = np.any((self.dataset.index.weekday == 5,  # 周六，因为Monday=0, Sunday=6.
-                       self.dataset.index.weekday == 6,  # 周天，因为Monday=0, Sunday=6.
+        mask = np.any((self.dataset.index.__setattr__("weekday", 5),  # 周六，因为Monday=0, Sunday=6.
+                       self.dataset.index.__setattr__("weekday", 6),  # 周天，因为Monday=0, Sunday=6.
                        self.dataset['holiday'] == 1), axis=0)
         if inplace:
             self.dataset.loc[mask, 'active power'] = 0
@@ -947,11 +947,10 @@ if __name__ == '__main__':
     pass
     # tt = ampds2_dataset_full_df(600)
 
-
     # %% Execute in NILM_Project, preparing
     # pre_call_()
 
-    # %% Test codes
+    # %% Test codes, please ignore
     # ampds2_dataset, refit_dataset, uk_dale_dataset = load_datasets()
     # get_training_set_and_test_set_for_ampds2_dataset()
     # John_data = ScotlandLongerDataset('John')
@@ -961,3 +960,4 @@ if __name__ == '__main__':
     #         load_low_carbon_london_heat(_this_no, this_type)
     # load_ampds2_weather()
     # ampds2_dataset_full_df(30 * 60)
+    john_data_set = ScotlandLongerDataset("John").dataset
