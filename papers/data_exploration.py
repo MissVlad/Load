@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from pandas import DataFrame
 from nilmtk import MeterGroup
-from prepare_datasets import load_datasets, load_ampds2_weather, ScotlandLongerDataset, ScotlandShorterDataset
+from prepare_datasets import load_datasets, load_ampds2_or_ukdale_weather, ScotlandLongerDataset, ScotlandShorterDataset
 from matplotlib import pyplot as plt
 from Ploting.adjust_Func import reassign_linestyles_recursively_in_ax, adjust_legend_in_ax
 from Ploting.fast_plot_Func import series, time_series, scatter
@@ -98,7 +98,7 @@ def energies_paper_one_day_visulisation_for_ampds2_dataset():
 
 
 def energies_paper_correlation_exploration_for_ampds2_dataset():
-    _ampds2_weather_df = load_ampds2_weather()
+    _ampds2_weather_df = load_ampds2_or_ukdale_weather()
     # %% main
     mains_df = next(ampds2_dataset.buildings[1].elec.mains().load(ac_type='active', sample_period=60))
 

@@ -25,15 +25,12 @@
     </select>
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="43c57110-725f-4a7b-90b7-cc09d5a22551" name="Default Changelist" comment="regular updates">
-      <change afterPath="$PROJECT_DIR$/papers/MEEPS_2020.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/Code.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/Code.iml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/inspectionProfiles/profiles_settings.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/inspectionProfiles/profiles_settings.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+    <list default="true" id="43c57110-725f-4a7b-90b7-cc09d5a22551" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/papers/Energies_Research_paper_2020.py" beforeDir="false" afterPath="$PROJECT_DIR$/papers/Energies_Research_paper_2020.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/nilm.py" beforeDir="false" afterPath="$PROJECT_DIR$/nilm.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/papers/data_exploration.py" beforeDir="false" afterPath="$PROJECT_DIR$/papers/data_exploration.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/prepare_datasets.py" beforeDir="false" afterPath="$PROJECT_DIR$/prepare_datasets.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/../../../Python_Project_common_package/Correlation_Modeling/FFTCorrelation_Class.py" beforeDir="false" afterPath="$PROJECT_DIR$/../../../Python_Project_common_package/Correlation_Modeling/FFTCorrelation_Class.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/../../../Python_Project_common_package/TimeSeries_Class.py" beforeDir="false" afterPath="$PROJECT_DIR$/../../../Python_Project_common_package/TimeSeries_Class.py" afterDir="false" />
     </list>
     <list id="a096d756-1ac3-4293-a23d-21926fc15656" name="1) flexible windowed class and __iter__, suitable for STFT, considering various window types; 2) adjust_Func.py updated for convenient adjust AxesSubplot; 3) full manual STFT results, NB: rectangle window is the best; 4) scipy.signal.find_peaks must be added to FFTProcessor class" comment="" />
     <option name="SHOW_DIALOG" value="false" />
@@ -80,7 +77,7 @@
     <property name="node.js.selected.package.eslint" value="(autodetect)" />
     <property name="nodejs_package_manager_path" value="npm" />
     <property name="run.code.analysis.last.selected.profile" value="aDefault" />
-    <property name="settings.editor.selected.configurable" value="Errors" />
+    <property name="settings.editor.selected.configurable" value="com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable" />
   </component>
   <component name="PyConsoleOptionsProvider">
     <option name="myPythonConsoleState">
@@ -99,7 +96,7 @@
       <recent name="C:\Users\SoapClancy\OneDrive\PhD\01-PhDProject\Python_Project_common_package\" />
     </key>
   </component>
-  <component name="RunManager" selected="Python.Energies_Research_paper_2020">
+  <component name="RunManager" selected="Python.prepare_datasets">
     <configuration name="Energies_Research_paper_2020" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="Code" />
       <option name="INTERPRETER_OPTIONS" value="" />
@@ -166,28 +163,6 @@
       <option name="INPUT_FILE" value="" />
       <method v="2" />
     </configuration>
-    <configuration name="cluster_computing_run_SP4" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
-      <module name="Code" />
-      <option name="INTERPRETER_OPTIONS" value="" />
-      <option name="PARENT_ENVS" value="true" />
-      <envs>
-        <env name="PYTHONUNBUFFERED" value="1" />
-      </envs>
-      <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/papers" />
-      <option name="IS_MODULE_SDK" value="true" />
-      <option name="ADD_CONTENT_ROOTS" value="true" />
-      <option name="ADD_SOURCE_ROOTS" value="true" />
-      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/papers/cluster_computing_run_SP4.py" />
-      <option name="PARAMETERS" value="" />
-      <option name="SHOW_COMMAND_LINE" value="true" />
-      <option name="EMULATE_TERMINAL" value="false" />
-      <option name="MODULE_MODE" value="false" />
-      <option name="REDIRECT_INPUT" value="false" />
-      <option name="INPUT_FILE" value="" />
-      <method v="2" />
-    </configuration>
     <configuration name="prepare_datasets" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="Code" />
       <option name="INTERPRETER_OPTIONS" value="" />
@@ -232,20 +207,42 @@
       <option name="INPUT_FILE" value="" />
       <method v="2" />
     </configuration>
+    <configuration name="temp_run" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+      <module name="Code" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/temp_run.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="true" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
     <list>
-      <item itemvalue="Python.cluster_computing_run_SP4" />
       <item itemvalue="Python.prepare_datasets" />
       <item itemvalue="Python.seq2seq_forecast" />
       <item itemvalue="Python.MEEPS_2020" />
       <item itemvalue="Python.Energies_Research_paper_2020" />
+      <item itemvalue="Python.temp_run" />
     </list>
     <recent_temporary>
       <list>
-        <item itemvalue="Python.Energies_Research_paper_2020" />
         <item itemvalue="Python.prepare_datasets" />
+        <item itemvalue="Python.temp_run" />
+        <item itemvalue="Python.Energies_Research_paper_2020" />
         <item itemvalue="Python.MEEPS_2020" />
         <item itemvalue="Python.seq2seq_forecast" />
-        <item itemvalue="Python.cluster_computing_run_SP4" />
       </list>
     </recent_temporary>
   </component>
@@ -450,6 +447,13 @@
       <workItem from="1604313806637" duration="3357000" />
       <workItem from="1605524844481" duration="6419000" />
       <workItem from="1605606260506" duration="1293000" />
+      <workItem from="1605725543621" duration="727000" />
+      <workItem from="1605777170241" duration="4668000" />
+      <workItem from="1605784962465" duration="39000" />
+      <workItem from="1605785859760" duration="422000" />
+      <workItem from="1605786321967" duration="7244000" />
+      <workItem from="1605865154004" duration="15521000" />
+      <workItem from="1605885429839" duration="6912000" />
     </task>
     <task id="LOCAL-00001" summary="n/a">
       <created>1588669410795</created>
@@ -668,7 +672,14 @@
       <option name="project" value="LOCAL" />
       <updated>1603618319874</updated>
     </task>
-    <option name="localTasksCounter" value="32" />
+    <task id="LOCAL-00032" summary="Some plot wrappers. And accuracy improvement for lasso-fft">
+      <created>1605725612351</created>
+      <option name="number" value="00032" />
+      <option name="presentableId" value="LOCAL-00032" />
+      <option name="project" value="LOCAL" />
+      <updated>1605725612351</updated>
+    </task>
+    <option name="localTasksCounter" value="33" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -721,7 +732,8 @@
     <MESSAGE value="TF and PyTorch seq2seq attention models" />
     <MESSAGE value="N/A" />
     <MESSAGE value="NILMDataSet class added. TensorFLow model added." />
-    <option name="LAST_COMMIT_MESSAGE" value="NILMDataSet class added. TensorFLow model added." />
+    <MESSAGE value="Some plot wrappers. And accuracy improvement for lasso-fft" />
+    <option name="LAST_COMMIT_MESSAGE" value="Some plot wrappers. And accuracy improvement for lasso-fft" />
   </component>
   <component name="WindowStateProjectService">
     <state x="1701" y="324" key="#Plugins" timestamp="1603369730823">
@@ -732,63 +744,72 @@
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
     <state x="1888" y="396" key="#com.intellij.ide.util.MemberChooser/0.0.3440.1400@0.0.3440.1400" timestamp="1603575197081" />
-    <state x="158" y="476" width="964" height="832" key="#xdebugger.evaluate" timestamp="1605530192651">
+    <state x="288" y="581" width="964" height="819" key="#xdebugger.evaluate" timestamp="1605892322803">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
-    <state x="158" y="476" width="964" height="832" key="#xdebugger.evaluate/0.0.3440.1400@0.0.3440.1400" timestamp="1605530192651" />
-    <state width="2134" height="646" key="DebuggerActiveHint" timestamp="1603572236317">
+    <state x="288" y="581" width="964" height="819" key="#xdebugger.evaluate/0.0.3440.1400@0.0.3440.1400" timestamp="1605892322803" />
+    <state x="1566" y="224" key="CommitChangelistDialog2" timestamp="1605725611262">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
-    <state width="2134" height="646" key="DebuggerActiveHint/0.0.3440.1400@0.0.3440.1400" timestamp="1603572236317" />
-    <state x="717" y="298" key="FileChooserDialogImpl" timestamp="1598276056682">
-      <screen x="0" y="0" width="1368" height="872" />
+    <state x="1566" y="224" key="CommitChangelistDialog2/0.0.3440.1400@0.0.3440.1400" timestamp="1605725611262" />
+    <state width="2134" height="646" key="DebuggerActiveHint" timestamp="1605866841271">
+      <screen x="0" y="0" width="3440" height="1400" />
+    </state>
+    <state width="2134" height="646" key="DebuggerActiveHint/0.0.3440.1400@0.0.3440.1400" timestamp="1605866841271" />
+    <state x="1803" y="478" key="FileChooserDialogImpl" timestamp="1605785927860">
+      <screen x="0" y="0" width="3440" height="1400" />
     </state>
     <state x="717" y="298" key="FileChooserDialogImpl/0.0.1368.872@0.0.1368.872" timestamp="1598276056682" />
-    <state width="2528" height="445" key="GridCell.Tab.0.bottom" timestamp="1605530590561">
+    <state x="1803" y="478" key="FileChooserDialogImpl/0.0.3440.1400@0.0.3440.1400" timestamp="1605785927860" />
+    <state width="2460" height="406" key="GridCell.Tab.0.bottom" timestamp="1605905447862">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
-    <state width="2528" height="445" key="GridCell.Tab.0.bottom/0.0.3440.1400@0.0.3440.1400" timestamp="1605530590561" />
-    <state width="2528" height="445" key="GridCell.Tab.0.center" timestamp="1605530590561">
+    <state width="2460" height="406" key="GridCell.Tab.0.bottom/0.0.3440.1400@0.0.3440.1400" timestamp="1605905447862" />
+    <state width="2460" height="406" key="GridCell.Tab.0.center" timestamp="1605905447861">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
-    <state width="2528" height="445" key="GridCell.Tab.0.center/0.0.3440.1400@0.0.3440.1400" timestamp="1605530590561" />
-    <state width="2528" height="445" key="GridCell.Tab.0.left" timestamp="1605530590560">
+    <state width="2460" height="406" key="GridCell.Tab.0.center/0.0.3440.1400@0.0.3440.1400" timestamp="1605905447861" />
+    <state width="2460" height="406" key="GridCell.Tab.0.left" timestamp="1605905447861">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
-    <state width="2528" height="445" key="GridCell.Tab.0.left/0.0.3440.1400@0.0.3440.1400" timestamp="1605530590560" />
-    <state width="2528" height="445" key="GridCell.Tab.0.right" timestamp="1605530590561">
+    <state width="2460" height="406" key="GridCell.Tab.0.left/0.0.3440.1400@0.0.3440.1400" timestamp="1605905447861" />
+    <state width="2460" height="406" key="GridCell.Tab.0.right" timestamp="1605905447862">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
-    <state width="2528" height="445" key="GridCell.Tab.0.right/0.0.3440.1400@0.0.3440.1400" timestamp="1605530590561" />
-    <state width="2528" height="445" key="GridCell.Tab.1.bottom" timestamp="1605530590561">
+    <state width="2460" height="406" key="GridCell.Tab.0.right/0.0.3440.1400@0.0.3440.1400" timestamp="1605905447862" />
+    <state width="2460" height="406" key="GridCell.Tab.1.bottom" timestamp="1605905447862">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
-    <state width="2528" height="445" key="GridCell.Tab.1.bottom/0.0.3440.1400@0.0.3440.1400" timestamp="1605530590561" />
-    <state width="2528" height="445" key="GridCell.Tab.1.center" timestamp="1605530590561">
+    <state width="2460" height="406" key="GridCell.Tab.1.bottom/0.0.3440.1400@0.0.3440.1400" timestamp="1605905447862" />
+    <state width="2460" height="406" key="GridCell.Tab.1.center" timestamp="1605905447862">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
-    <state width="2528" height="445" key="GridCell.Tab.1.center/0.0.3440.1400@0.0.3440.1400" timestamp="1605530590561" />
-    <state width="2528" height="445" key="GridCell.Tab.1.left" timestamp="1605530590561">
+    <state width="2460" height="406" key="GridCell.Tab.1.center/0.0.3440.1400@0.0.3440.1400" timestamp="1605905447862" />
+    <state width="2460" height="406" key="GridCell.Tab.1.left" timestamp="1605905447862">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
-    <state width="2528" height="445" key="GridCell.Tab.1.left/0.0.3440.1400@0.0.3440.1400" timestamp="1605530590561" />
-    <state width="2528" height="445" key="GridCell.Tab.1.right" timestamp="1605530590561">
+    <state width="2460" height="406" key="GridCell.Tab.1.left/0.0.3440.1400@0.0.3440.1400" timestamp="1605905447862" />
+    <state width="2460" height="406" key="GridCell.Tab.1.right" timestamp="1605905447862">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
-    <state width="2528" height="445" key="GridCell.Tab.1.right/0.0.3440.1400@0.0.3440.1400" timestamp="1605530590561" />
-    <state x="1151" y="484" key="SettingsEditor" timestamp="1605525282511">
+    <state width="2460" height="406" key="GridCell.Tab.1.right/0.0.3440.1400@0.0.3440.1400" timestamp="1605905447862" />
+    <state x="1151" y="484" key="SettingsEditor" timestamp="1605785951463">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
     <state x="374" y="157" key="SettingsEditor/0.0.1368.872@0.0.1368.872" timestamp="1598275818761" />
-    <state x="1151" y="484" key="SettingsEditor/0.0.3440.1400@0.0.3440.1400" timestamp="1605525282511" />
-    <state x="1577" y="434" key="Vcs.Push.Dialog.v2" timestamp="1603618322239">
+    <state x="1151" y="484" key="SettingsEditor/0.0.3440.1400@0.0.3440.1400" timestamp="1605785951463" />
+    <state x="1577" y="434" key="Vcs.Push.Dialog.v2" timestamp="1605725613906">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
-    <state x="1577" y="434" key="Vcs.Push.Dialog.v2/0.0.3440.1400@0.0.3440.1400" timestamp="1603618322239" />
-    <state width="1309" height="660" key="XDebugger.FullValuePopup" timestamp="1603574175675">
+    <state x="1577" y="434" key="Vcs.Push.Dialog.v2/0.0.3440.1400@0.0.3440.1400" timestamp="1605725613906" />
+    <state width="1309" height="660" key="XDebugger.FullValuePopup" timestamp="1605892322690">
       <screen x="0" y="0" width="3440" height="1400" />
     </state>
-    <state width="1309" height="660" key="XDebugger.FullValuePopup/0.0.3440.1400@0.0.3440.1400" timestamp="1603574175675" />
+    <state width="1309" height="660" key="XDebugger.FullValuePopup/0.0.3440.1400@0.0.3440.1400" timestamp="1605892322690" />
+    <state x="1464" y="436" key="com.intellij.execution.console.ConsoleHistoryController$MyBrowseAction$1" timestamp="1605890931286">
+      <screen x="0" y="0" width="3440" height="1400" />
+    </state>
+    <state x="1464" y="436" key="com.intellij.execution.console.ConsoleHistoryController$MyBrowseAction$1/0.0.3440.1400@0.0.3440.1400" timestamp="1605890931286" />
     <state x="486" y="346" key="com.intellij.ide.util.TipDialog" timestamp="1598433771567">
       <screen x="0" y="0" width="1920" height="1160" />
     </state>
@@ -821,7 +842,7 @@
     <SUITE FILE_PATH="coverage/Code$data_exploration.coverage" NAME="data_exploration Coverage Results" MODIFIED="1591377375156" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/Code$TimeSeries_Class.coverage" NAME="TimeSeries_Class Coverage Results" MODIFIED="1590074987807" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/../../../Python_Project_common_package" />
     <SUITE FILE_PATH="coverage/Code$NdarraySubclassing.coverage" NAME="NdarraySubclassing Coverage Results" MODIFIED="1589544590561" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/../../../Python_Project_common_package" />
-    <SUITE FILE_PATH="coverage/Code$prepare_datasets.coverage" NAME="prepare_datasets Coverage Results" MODIFIED="1603573179667" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/Code$prepare_datasets.coverage" NAME="prepare_datasets Coverage Results" MODIFIED="1605892248987" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/Code$temp3.coverage" NAME="temp3 Coverage Results" MODIFIED="1589125244220" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/Code$scratch.coverage" NAME="scratch Coverage Results" MODIFIED="1591282130644" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$APPLICATION_CONFIG_DIR$/scratches" />
     <SUITE FILE_PATH="coverage/Code$utils.coverage" NAME="utils Coverage Results" MODIFIED="1590480377633" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/../../../Python_Project_common_package/Correlation_Modeling" />

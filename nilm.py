@@ -5,7 +5,7 @@ from pandas import DataFrame
 from Ploting.fast_plot_Func import *
 from project_utils import project_path_
 from prepare_datasets import get_training_set_and_test_set_for_ampds2_dataset, NILMTorchDatasetForecast, \
-    load_ampds2_weather, NILMTorchDataset
+    load_ampds2_or_ukdale_weather, NILMTorchDataset
 from nilmtk.legacy.disaggregate import CombinatorialOptimisation, FHMM
 from pathlib import Path
 from File_Management.path_and_file_management_Func import try_to_find_file, try_to_find_folder_path_otherwise_make_one
@@ -91,7 +91,7 @@ def energies_paper_prepare_dataset_for_torch_model_for_ampds2_dataset(*, applian
             ac_type='active', sample_period=sample_period)).droplevel('physical_quantity', axis=1)  # type: DataFrame
         mains_df.rename(columns={mains_df.columns[0]: 'mains_var'}, inplace=True)
         # weather_var
-        ampds2_weather_df = load_ampds2_weather()
+        ampds2_weather_df = load_ampds2_or_ukdale_weather()
         mains_weather_df_merged = merge_two_time_series_df(mains_df, ampds2_weather_df)
         mains_weather_df_merged = mains_weather_df_merged.reindex(columns=mains_weather_df_merged.columns[1:].append(
             mains_weather_df_merged.columns[slice(1)]))

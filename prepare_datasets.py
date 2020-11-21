@@ -19,15 +19,16 @@ from pandas import DataFrame
 from Time_Processing.datetime_utils import DatetimeOnehotORCircularEncoder
 from sklearn.preprocessing import MinMaxScaler, OneHotEncoder
 from Data_Preprocessing.TruncatedOrCircularToLinear_Class import CircularToLinear
-from tensorflow.keras.utils import to_categorical
 from functools import reduce
 import math
+import re
 
 try:
     from nilmtk import DataSet, MeterGroup
     from nilmtk.dataset_converters.refit.convert_refit import convert_refit
     from pyorbital.moon_phase import moon_phase
     from workalendar.america import Canada
+    from workalendar.europe import UnitedKingdom, Turkey
 
 except ModuleNotFoundError:
     pass
@@ -35,12 +36,15 @@ except ModuleNotFoundError:
 try:
     import torch
     from Writting import docx_document_template_to_collect_figures
+    from tensorflow.keras.utils import to_categorical
     from torch.utils.data import Dataset as TorchDataSet
     from docx.shared import Cm, Pt
     from docx.enum.text import WD_BREAK
     from workalendar.america import Canada
+    from workalendar.europe import UnitedKingdom, Turkey
     from pyorbital.moon_phase import moon_phase
     import tensorflow as tf
+    from Regression_Analysis.DataSet_Class import DeepLearningDataSet
 
 
     class NILMTorchDataset(TorchDataSet):
@@ -120,7 +124,7 @@ try:
                                       day=self.data.index[-1].day,
                                       hour=self.data.index[-1].hour,
                                       minute=self.data.index[-1].minute),
-                freq=self.data.index.freq)
+                freq=self.data.index.__getattribute__("freq"))
             )
             # 时间变量
             datetime_onehot_or_circular_encoder_1 = DatetimeOnehotORCircularEncoder(to_encoding_args=('holiday',
@@ -421,38 +425,49 @@ def load_low_carbon_london_heat(this_no, df_name: str):
     document.save(f'.\\London {df_name} data household_{this_no}.docx')
 
 
-def load_ampds2_weather():
+def load_ampds2_or_ukdale_weather(use_merra_ii: bool = True, *, name: str):
     """
     载入ampds2的天气数据
     :return:
     """
-    _path = os.path.join(DATASET_ROOT_DIRECTORY,
-                         r'AMPds2/dataverse_files/Climate_HourlyWeather.csv')
-    reading = pd.read_csv(_path,
-                          sep=',')
-    read_results = reading[['Temp (C)', 'Rel Hum (%)', 'Stn Press (kPa)']]
-    read_results.index = pd.DatetimeIndex(pd.to_datetime(reading.iloc[:, 0],
-                                                         format='%Y-%m-%d %H:%M'))
-    # _path = os.path.join(DATASET_ROOT_DIRECTORY,
-    #                      r'AMPds2/MERRA2/')
-    # # America / Vancouver
-    # if not os.path.exists(_path + "weather.pkl"):
-    #     read_results = pd.DataFrame()
-    #     for file in ('2012.csv', '2013.csv', '2014.csv'):
-    #         reading = pd.read_csv(_path + file,
-    #                               sep=',',
-    #                               skiprows=3)
-    #         read_results = pd.concat((read_results,
-    #                                   pd.DataFrame(index=pd.DatetimeIndex(reading['local_time']),
-    #                                                data={'temperature': reading['temperature'].values,
-    #                                                      'solar irradiation': reading['radiation_surface'].values,
-    #                                                      'precipitation': reading['precipitation'].values,
-    #                                                      'air density': reading['air_density'].values})
-    #                                   ))
-    #     read_results = read_results.loc[~read_results.index.duplicated()]
-    #     read_results.to_pickle(_path + "weather.pkl")
-    # else:
-    #     read_results = pd.read_pickle(_path + "weather.pkl")  # type: pd.DataFrame
+    assert name in ("ampds2", "uk dale")
+    if not use_merra_ii:
+        assert name == "ampds2"
+        _path = os.path.join(DATASET_ROOT_DIRECTORY,
+                             r'AMPds2/dataverse_files/Climate_HourlyWeather.csv')
+        reading = pd.read_csv(_path,
+                              sep=',')
+        read_results = reading[['Temp (C)', 'Rel Hum (%)', 'Stn Press (kPa)']]
+        read_results.index = pd.DatetimeIndex(pd.to_datetime(reading.iloc[:, 0],
+                                                             format='%Y-%m-%d %H:%M'))
+    else:
+        _path = os.path.join(DATASET_ROOT_DIRECTORY,
+                             fr"{'AMPds2' if name == 'ampds2' else 'UK-DALE'}/MERRA2/")
+        # America / Vancouver
+        if not os.path.exists(_path + "weather.pkl"):
+            read_results = pd.DataFrame()
+            years = [int(re.findall(r"(?<=_)\d+(?=.*)", x)[0]) for x in os.listdir(_path)]
+            years = range(min(years), max(years) + 1)
+            for year in years:
+                reading = pd.read_csv(_path + f"MERRA_II_{year}.csv",
+                                      sep=',',
+                                      skiprows=3)
+                reading_wind = pd.read_csv(_path + f"MERRA_II_{year}_Wind.csv",
+                                           sep=',',
+                                           skiprows=3)
+                hour_shift = 8 if name == 'ampds2' else 0
+                # UTC没有day-saving time！
+                reading.index = pd.to_datetime(reading['time']) - datetime.timedelta(hours=hour_shift)
+                reading = reading.drop(['time', 'local_time'], axis=1)
+                reading.loc[:, 'wind speed'] = reading_wind['wind_speed'].values
+
+                read_results = pd.concat((read_results, reading))
+            if np.sum(read_results.index.duplicated()) > 0:
+                raise
+            read_results.tz_localize(None)
+            read_results.to_pickle(_path + "weather.pkl")
+        else:
+            read_results = pd.read_pickle(_path + "weather.pkl")  # type: pd.DataFrame
     #
     return read_results
 
@@ -510,6 +525,34 @@ def get_training_set_and_test_set_for_ampds2_dataset():
     return training_set, test_set, whole_set
 
 
+def _add_dst_holiday_info_etc(data_df, country, hour_shift: Union[int, None]):
+    date_time_one_hot_encoder = DatetimeOnehotORCircularEncoder(to_encoding_args=('holiday', 'summer_time'))
+    time_var_transformed = date_time_one_hot_encoder(
+        # 'holiday' and 'summer_time' must use full_data_df.index
+        data_df.__getattribute__('index'),
+        country=country
+    )
+    # %% holiday and summer_time must be tz-aware
+    data_df['holiday'] = np.array(time_var_transformed.iloc[:, 0] == 1, dtype=int)
+    data_df['summer_time'] = np.array(time_var_transformed.iloc[:, 1] == 1, dtype=int)
+    if hour_shift is not None:
+        index = data_df.index.tz_convert('UTC').tz_localize(None) + datetime.timedelta(hours=hour_shift)
+    else:
+        assert data_df.index.tz is None
+        index = data_df.index
+
+    data_df.index = index
+    # %% Others are inferred from UTC, which does not have day-saving time, and also compatible with MERRA_II
+    data_df['year'] = index.year
+    data_df['month'] = index.month
+    data_df['day'] = index.day
+    data_df['dayofweek'] = index.dayofweek + 1
+    data_df['hour'] = index.hour
+    data_df['minute'] = index.minute
+    data_df['moon_phase'] = moon_phase(index.to_numpy())
+    return data_df
+
+
 def ampds2_dataset_full_df(resolution: int) -> pd.DataFrame:
     """
     ampds2_dataset的heat，main，和对应的气象，和对应的时间
@@ -526,48 +569,17 @@ def ampds2_dataset_full_df(resolution: int) -> pd.DataFrame:
 
         mains_df = next(ampds2.mains().load(
             ac_type='active', sample_period=resolution)).droplevel('physical_quantity', axis=1)  # type: DataFrame
-        mains_df.rename(columns={mains_df.columns[0]: 'Mains'}, inplace=True)
+        mains_df.rename(columns={mains_df.columns[0]: 'mains'}, inplace=True)
+        mains_df = _add_dst_holiday_info_etc(mains_df, Canada(), -8)
 
-        ampds2_weather_df = load_ampds2_weather()
-        mains_weather_df_merged = merge_two_time_series_df(mains_df, ampds2_weather_df)
-        mains_weather_df_merged = mains_weather_df_merged.reindex(columns=mains_weather_df_merged.columns[1:].append(
-            mains_weather_df_merged.columns[slice(1)]))
+        ampds2_weather_df = load_ampds2_or_ukdale_weather(name="ampds2")
 
-        full_data_df = pd.concat((mains_weather_df_merged, heating_df), axis=1)
+        full_data = pd.merge(mains_df, ampds2_weather_df, how="left", left_index=True, right_index=True)
+        full_data.loc[:, "heating"] = heating_df.values.flatten()
+        full_data = full_data.interpolate('time')
+        full_data.dtype = float
 
-        # WARNING: full_data_df.index is not used! because stupid Pandas force to have DST transformation, causing two
-        # 1.00 am problem, despite that the original datetime has already been taken care of!
-        # full_data_df['index_index'] = range(full_data_df.shape[0]) # This line is for debug
-        # index_source = full_data_df.index # This line is to use full_data_df.index
-        index_source = pd.DatetimeIndex(pd.date_range(
-            start=datetime.datetime(year=full_data_df.index[0].year,
-                                    month=full_data_df.index[0].month,
-                                    day=full_data_df.index[0].day,
-                                    hour=full_data_df.index[0].hour,
-                                    minute=full_data_df.index[0].minute),
-            end=datetime.datetime(year=full_data_df.index[-1].year,
-                                  month=full_data_df.index[-1].month,
-                                  day=full_data_df.index[-1].day,
-                                  hour=full_data_df.index[-1].hour,
-                                  minute=full_data_df.index[-1].minute),
-            freq=full_data_df.index.freq)
-        )
-        full_data_df['year'] = index_source.year
-        full_data_df['month'] = index_source.month
-        full_data_df['day'] = index_source.day
-        full_data_df['dayofweek'] = index_source.dayofweek + 1
-        full_data_df['hour'] = index_source.hour
-        full_data_df['minute'] = index_source.minute
-        full_data_df['moon_phase'] = moon_phase(full_data_df.index.to_numpy())  # Moon phase must use full_data_df.index
-        date_time_one_hot_encoder = DatetimeOnehotORCircularEncoder(to_encoding_args=('holiday', 'summer_time'))
-        time_var_transformed = date_time_one_hot_encoder(
-            # 'holiday' and 'summer_time' must use full_data_df.index
-            full_data_df.__getattribute__('index'),
-            country=Canada()
-        )
-        full_data_df['holiday'] = np.array(time_var_transformed.iloc[:, 0] == 1, dtype=int)
-        full_data_df['summer_time'] = np.array(time_var_transformed.iloc[:, 1] == 1, dtype=int)
-        return full_data_df
+        return full_data
 
     return func()
 
@@ -724,7 +736,7 @@ def load_turkey_dataset():
                 datetime_index = pd.DatetimeIndex(pd.to_datetime(val.values[:, 0]))
                 this_sheet_df = pd.DataFrame(data=val['Active'].values,
                                              index=datetime_index.round('H'),
-                                             columns=['main' if 'Main' in key else 'lighting']).sort_index()
+                                             columns=['mains' if 'Main' in key else 'lighting']).sort_index()
                 this_sheet_df = this_sheet_df[~this_sheet_df.index.duplicated(keep='first')]
                 if i == 0:
                     reading_df = this_sheet_df
@@ -737,8 +749,11 @@ def load_turkey_dataset():
             for i, year in enumerate((2017, 2018)):
                 this_weather_df = pd.read_csv(TURKEY_ROOT_DIRECTORY / f'{file_prefix}_MERRA_II_{year}.csv',
                                               skiprows=3)
+                wind_ndarray = pd.read_csv(TURKEY_ROOT_DIRECTORY / f'{file_prefix}_MERRA_II_{year}_Wind.csv',
+                                           skiprows=3).iloc[:, -1].values
                 this_weather_df.index = pd.DatetimeIndex(pd.to_datetime(this_weather_df['local_time'].values))
                 this_weather_df = this_weather_df.iloc[:, 2:]
+                this_weather_df['wind speed'] = wind_ndarray
                 if i == 0:
                     weather_df = this_weather_df
                 else:
@@ -747,13 +762,14 @@ def load_turkey_dataset():
             # %% Merge
             merged_reading = pd.merge(reading_df, weather_df, left_index=True, right_index=True, how='left')
             #
+            merged_reading = _add_dst_holiday_info_etc(merged_reading, Turkey(), None)
             turkey_data[file_prefix] = merged_reading
         return turkey_data
 
     return func()
 
 
-def pre_call_():
+def pre_call_(sample_period=60):
     """
     This is to save the followings to pd.DataFrame format:
     - Ampds 2, main, heat, weather
@@ -764,12 +780,13 @@ def pre_call_():
     The only reason NILM_Project exists is to transform the required data (especially for Energies_Research_paper_2020)
     to pd.DataFrame.
     """
-    sample_period = 3600
     # %% Ampds2
-    ampds2_dataset_full_df(sample_period)
+    ampds2_dataset = ampds2_dataset_full_df(sample_period)
+    tt = 1
 
     # %% UK Dale
-    @load_exist_pkl_file_otherwise_run_and_save(project_path_ / r'Data\Raw\for_Energies_Research_paper_2020\UKDALE.pkl')
+    @load_exist_pkl_file_otherwise_run_and_save(project_path_ / (r"Data\Raw\for_Energies_Research_paper_2020\\" +
+                                                                 fr"UKDALE_{sample_period}.pkl"))
     def func():
         _, _, uk_dale = load_datasets()
 
@@ -791,173 +808,87 @@ def pre_call_():
             else:
                 uk_dale_df = pd.merge(uk_dale_df,
                                       this_df, left_index=True, right_index=True, how='outer')
-        return uk_dale_df
 
-    func()
+        uk_dale_df = _add_dst_holiday_info_etc(uk_dale_df, UnitedKingdom(), 0)
+        weather = load_ampds2_or_ukdale_weather(name='uk dale')
+        full_data = pd.merge(uk_dale_df, weather, how="left", left_index=True, right_index=True)
+        full_data = full_data.interpolate('time')
+        full_data.dtype = float
+        return full_data
+
+    uk_dale_dataset = func()
+
+    return ampds2_dataset, uk_dale_dataset
 
 
-class NILMDataSet:
+class NILMDataSet(DeepLearningDataSet):
     __slots__ = ('data', 'name', 'transformed_cols_meta', 'transformed_data', 'predictor_cols', 'dependant_cols')
 
-    def __init__(self, original_data_set: pd.DataFrame, *,
-                 name: str,
-                 cos_sin_transformed_col: Tuple[str, ...] = None,
-                 min_max_transformed_col: Tuple[str, ...] = None,
-                 one_hot_transformed_col: Tuple[str, ...] = None,
-                 non_transformed_col: Tuple[str, ...] = None,
-                 predictor_cols: Tuple[str, ...] = None,
-                 dependant_cols: Tuple[str, ...] = None,
-                 transformation_args_path: Path = None):
+    def __init__(self, *, name: str, resolution: int = None, appliance: str,
+                 transformation_args_folder_path: Path, **kwargs):
         assert ('training' in name) or ('test' in name)
-        assert (predictor_cols or dependant_cols) is not None
-        assert not ((predictor_cols is not None) and (dependant_cols is not None))
+        assert appliance in ('heating', 'lighting')
 
-        self.data = original_data_set  # type: pd.DataFrame
-        self.name = name
-        self.transformed_cols_meta = {
-            'cos_sin_transformed_col': cos_sin_transformed_col,
-            'min_max_transformed_col': min_max_transformed_col,
-            'one_hot_transformed_col': one_hot_transformed_col,
-            'non_transformed_col': non_transformed_col
-        }
-        self.predictor_cols, self.dependant_cols = self._infer_predictor_and_dependant_cols(predictor_cols,
-                                                                                            dependant_cols)
-        self.transformed_data = self._preprocess(transformation_args_path)
+        if 'Ampds2' in name:
+            original_data_set = load_pkl_file(project_path_ / (r"Data\Raw\for_Energies_Research_paper_2020\\" +
+                                                               f"Ampds2_resolution_{resolution}.pkl"))
+            mask = original_data_set.index < datetime.datetime(2013, 4, 1)
+        elif 'UKDALE' in name:
+            original_data_set = load_pkl_file(project_path_ / (r"Data\Raw\for_Energies_Research_paper_2020\\" +
+                                                               f"UKDALE_{resolution}.pkl"))
+            mask = original_data_set.index < datetime.datetime(2016, 4, 25)
+        elif 'Turkey_apartment' in name:
+            original_data_set = load_pkl_file(project_path_ / r"Data\Raw\for_Energies_Research_paper_2020\Turkey.pkl")
+            original_data_set = original_data_set['Apartment']
+            mask = original_data_set.index < datetime.datetime(2018, 10, 29)
+        elif 'Turkey_Detached House' in name:
+            original_data_set = load_pkl_file(project_path_ / r"Data\Raw\for_Energies_Research_paper_2020\Turkey.pkl")
+            original_data_set = original_data_set['Detached House']
+            mask = original_data_set.index < datetime.datetime(2018, 10, 29)
 
-    @property
-    def considered_cols_list(self):
-        return list(chain(*self.transformed_cols_meta.values()))
-
-    def _infer_predictor_and_dependant_cols(self, predictor_cols, dependant_cols):
-        if predictor_cols is not None:
-            return predictor_cols, list(set(self.considered_cols_list) - set(predictor_cols))
         else:
-            return list(set(self.considered_cols_list) - set(dependant_cols)), dependant_cols
-
-    def _preprocess(self, transformation_args_path: Path = None):
-        """
-        This function
-        """
-        name = self.name.replace("test", "training")
-        transformation_args_path = transformation_args_path or (project_path_ / 'Data/Results/Energies_paper/'
-                                                                                'transformation_args' / f"{name}.pkl")
-
-        # %% Obtain the args for transformation
-        @load_exist_pkl_file_otherwise_run_and_save(transformation_args_path)
-        def load_transformation_args_func():
-            _transformed_cols_args = {key: None for key in self.transformed_cols_meta}
-            _new_multi_index_columns = {key: None for key in self.considered_cols_list}
-            # %% min_max_transformed_col
-            min_max_scaler = MinMaxScaler()
-            min_max_scaler.fit(self.data[list(self.transformed_cols_meta['min_max_transformed_col'])].values)
-            _transformed_cols_args['min_max_transformed_col'] = min_max_scaler
-            for this_col in self.transformed_cols_meta['min_max_transformed_col']:
-                _new_multi_index_columns[this_col] = [(this_col, 'min_max')]
-
-            # %% cos_sin_transformed_col
-            cos_sin_transformed_col_args = {key: None for key in self.transformed_cols_meta['cos_sin_transformed_col']}
-            for this_col in self.transformed_cols_meta['cos_sin_transformed_col']:
-                this_col_data = self.data[this_col].values
-                this_col_lower_boundary = np.nanmin(this_col_data)
-                this_col_upper_boundary = np.nanmax(this_col_data)
-                cos_sin_transformed_col_args[this_col] = (this_col_lower_boundary, this_col_upper_boundary)
-                _new_multi_index_columns[this_col] = [(this_col, 'cos'), (this_col, 'sin')]
-            _transformed_cols_args['cos_sin_transformed_col'] = cos_sin_transformed_col_args
-
-            # %% one_hot_transformed_col
-            one_hot_encoder = OneHotEncoder()
-            one_hot_encoder.fit(self.data[list(self.transformed_cols_meta['one_hot_transformed_col'])].values)
-            for i, this_col in enumerate(self.transformed_cols_meta['one_hot_transformed_col']):
-                _new_multi_index_columns[this_col] = [(this_col, f'one_hot_{x}') for x in
-                                                      one_hot_encoder.categories_[i]]
-
-            # %% non_transformed_col
-            for this_col in self.transformed_cols_meta['non_transformed_col']:
-                _new_multi_index_columns[this_col] = [(this_col, 'original')]
-
-            _transformed_cols_args['one_hot_transformed_col'] = one_hot_encoder
-
-            return _transformed_cols_args, _new_multi_index_columns
-
-        transformed_cols_args, new_multi_index_columns = load_transformation_args_func()
-        # %% Do transformation
-        transformed_data = pd.DataFrame(
-            index=self.data.index,
-            columns=pd.MultiIndex.from_tuples(reduce(lambda a, b: a + b, new_multi_index_columns.values()),
-                                              names=('feature', 'notes')),
-            dtype=float
+            raise FileNotFoundError
+        if 'test' in name:
+            mask = ~mask
+        super(NILMDataSet, self).__init__(
+            original_data_set=original_data_set[mask],
+            name=name + f"_{resolution}_{appliance}",
+            cos_sin_transformed_col=('month',),
+            min_max_transformed_col=('mains', 'temperature', 'precipitation', 'snowfall', 'snow_mass', 'air_density',
+                                     'radiation_surface', 'wind speed', appliance),
+            one_hot_transformed_col=('dayofweek',),
+            non_transformed_col=('holiday', 'summer_time', 'moon_phase', 'cloud_cover'),
+            dependant_cols=(appliance,),
+            transformation_args_folder_path=transformation_args_folder_path,
+            stacked_shift_col=kwargs.get('stacked_shift_col', ()),  # Firstly, do sensitivity analysis, and back
+            stacked_shift_size=kwargs.get('stacked_shift_size', ()),  # Firstly, do sensitivity analysis, and back
+            how_many_stacked=kwargs.get('how_many_stacked', ()),  # Firstly, do sensitivity analysis, and back
         )
-        # %% min_max_transformed_col and one_hot_transformed_col
-        for _ in ('min_max_transformed_col', 'one_hot_transformed_col'):
-            _index = list(self.transformed_cols_meta[_])
-            trans = transformed_cols_args[_].transform(self.data[_index])
-            try:
-                transformed_data.loc[:, _index] = trans
-            except IndexError:
-                transformed_data.loc[:, _index] = trans.toarray().astype(int)
-
-        # %% cos_sin_transformed_col
-        _index = list(self.transformed_cols_meta['cos_sin_transformed_col'])
-        for this_index in _index:
-            obj = CircularToLinear(lower_boundary=transformed_cols_args['cos_sin_transformed_col'][this_index][0],
-                                   upper_boundary=transformed_cols_args['cos_sin_transformed_col'][this_index][1],
-                                   period=transformed_cols_args['cos_sin_transformed_col'][this_index][1])
-            trans = obj.transform(self.data[this_index].values)
-            transformed_data.loc[:, (this_index, 'cos')] = trans['cos']
-            transformed_data.loc[:, (this_index, 'sin')] = trans['sin']
-
-        # %% non_transformed_col
-        _index = list(self.transformed_cols_meta['non_transformed_col'])
-        transformed_data.loc[:, _index] = self.data[list(self.transformed_cols_meta['non_transformed_col'])].values
-        return transformed_data
-
-    def windowed_dataset(self, window_length: datetime.timedelta, *,
-                         drop_remainder=False,
-                         batch_size: int,
-                         shift=None) -> tf.data.Dataset:
-        assert np.unique(np.diff(self.transformed_data.index.values)).size == 1
-        freq = (self.transformed_data.index.values[1] - self.transformed_data.index.values[0]) / np.timedelta64(1, 's')
-        window_size = int(window_length.total_seconds() / freq)
-
-        transformed_data_ndarray = self.transformed_data.values
-        predictor_cols_index = list(chain(*[list(self.transformed_data.columns.__getattribute__('get_locs')([x]))
-                                            for x in self.predictor_cols]))
-        dependant_cols_index = list(chain(*[list(self.transformed_data.columns.__getattribute__('get_locs')([x]))
-                                            for x in self.dependant_cols]))
-        predictor_cols_index.sort()
-        dependant_cols_index.sort()
-
-        transformed_data_ndarray = tf.data.Dataset.from_tensor_slices(transformed_data_ndarray)
-        transformed_data_ndarray = transformed_data_ndarray.window(window_size,
-                                                                   shift=shift or window_size,
-                                                                   drop_remainder=drop_remainder)
-        transformed_data_ndarray = transformed_data_ndarray.flat_map(
-            lambda window: window.batch(window_size, drop_remainder=drop_remainder)
-        )
-        transformed_data_ndarray = transformed_data_ndarray.map(
-            lambda window: (tf.gather(window, predictor_cols_index, axis=1),
-                            tf.gather(window, dependant_cols_index, axis=1))
-        )
-        transformed_data_ndarray = transformed_data_ndarray.batch(batch_size).prefetch(1)
-        return transformed_data_ndarray
 
 
 if __name__ == '__main__':
-    # %% Load data sets
     pass
-    # tt = ampds2_dataset_full_df(600)
-
     # %% Execute in NILM_Project, preparing
-    # pre_call_()
+    # load_turkey_dataset()
+    # ampds2_dataset_, uk_dale_dataset_ = pre_call_(60)
+    # ampds2_dataset_, uk_dale_dataset_ = pre_call_(600)
+    # ampds2_dataset_, uk_dale_dataset_ = pre_call_(3600)
+
+    # %% Check and remove outliers
+    Ampds2_600 = load_pkl_file(project_path_ / (r"Data\Raw\for_Energies_Research_paper_2020\\" +
+                                                f"Ampds2_resolution_{600}.pkl"))
+    UKDALE_600 = load_pkl_file(project_path_ / rf"Data\Raw\for_Energies_Research_paper_2020\UKDALE_{600}.pkl")
+    # UKDALE_600.loc[UKDALE_600.loc[:, 'lighting'] > 500, 'lighting'] = np.nan
+    # save_pkl_file(project_path_ / rf"Data\Raw\for_Energies_Research_paper_2020\UKDALE_{600}.pkl", UKDALE_600)
+    #
+    # Ampds2_3600 = load_pkl_file(project_path_ / (r"Data\Raw\for_Energies_Research_paper_2020\\" +
+    #                                              f"Ampds2_resolution_{3600}.pkl"))
+    # UKDALE_3600 = load_pkl_file(project_path_ / rf"Data\Raw\for_Energies_Research_paper_2020\UKDALE_{3600}.pkl")
+    # UKDALE_3600.loc[UKDALE_3600.loc[:, 'lighting'] > 200, 'lighting'] = np.nan
+    # save_pkl_file(project_path_ / rf"Data\Raw\for_Energies_Research_paper_2020\UKDALE_{3600}.pkl", UKDALE_3600)
+    #
+    Turkey = load_pkl_file(project_path_ / r"Data\Raw\for_Energies_Research_paper_2020\Turkey.pkl")['Detached House']
 
     # %% Test codes, please ignore
-    # ampds2_dataset, refit_dataset, uk_dale_dataset = load_datasets()
-    # get_training_set_and_test_set_for_ampds2_dataset()
-    # John_data = ScotlandLongerDataset('John')
-    # John_data.set_weekends_and_holiday_to_zeros()
-    # for _this_no in (1, 2, 3, 4, 5, 7):
-    #     for this_type in ('heat', 'electric', 'electric and heat'):
-    #         load_low_carbon_london_heat(_this_no, this_type)
-    # load_ampds2_weather()
-    # ampds2_dataset_full_df(30 * 60)
-    john_data_set = ScotlandLongerDataset("John").dataset
+    # Ampds2 = NILMDataSet(name='Ampds2_training', resolution=600,  appliance='heating',
+    #                      transformation_args_folder_path=project_path_)
