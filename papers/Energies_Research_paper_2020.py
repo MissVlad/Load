@@ -14,73 +14,94 @@ from Time_Processing.format_convert_Func import np_datetime64_to_datetime
 from locale import setlocale, LC_ALL
 from Writting import *
 from tqdm import tqdm
-from prepare_datasets import NILMDataSet, ampds2_dataset_full_df
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras.layers import LSTM
-from prepare_datasets import ScotlandLongerDataset
+from prepare_datasets import ScotlandLongerDataset, NILMDataSet, ampds2_dataset_full_df
+from Regression_Analysis.DeepLearning_Class import TensorFlowCovBiLSTMEncoder, TensorFlowLSTMDecoder, GradientsAnalyser
+import time
+import re
+import os
+import inspect
+import scipy
 
 setlocale(LC_ALL, "en_US")
+tf.keras.backend.set_floatx("float64")
 
 remove_win10_max_path_limit()
-
 # %% Load all data sets used in the paper
+transformation_args_folder_path_common = project_path_ / r"Data\Results\Energies_paper"
 # Ampds2
-raw_data_path = project_path_ / r"Data\Raw\for_Energies_Research_paper_2020"
-AMPDS2_DATA = PhysicalInstanceDataFrame(load_pkl_file(raw_data_path / 'Ampds2.pkl'),
-                                        obj_name='Ampds2', predictor_names=(), dependant_names=())
-AMPDS2_DATA = AMPDS2_DATA.rename(
-    {
-        'Mains': 'main',
-        'HPE': 'heating',
-        'Temp (C)': 'environmental temperature'
-    },
-    axis=1
-)
+AMPDS2_PATH_600_HEATING = transformation_args_folder_path_common / "Ampds2_600_heating"
+AMPDS2_DATA_600_HEATING = {
+    'training': NILMDataSet(name='Ampds2_training', resolution=600, appliance='heating',
+                            transformation_args_folder_path=AMPDS2_PATH_600_HEATING),
+    'test': NILMDataSet(name='Ampds2_test', resolution=600, appliance='heating',
+                        transformation_args_folder_path=AMPDS2_PATH_600_HEATING),
+}
 # Turkey apartment
-TURKEY_APARTMENT_DATA = PhysicalInstanceDataFrame(load_pkl_file(raw_data_path / 'Turkey.pkl')['Apartment'],
-                                                  obj_name='Turkey apartment', predictor_names=(), dependant_names=())
-TURKEY_APARTMENT_DATA = TURKEY_APARTMENT_DATA.rename(
-    {
-        'temperature': 'environmental temperature',
-        'radiation_surface': 'solar irradiance'
-    },
-    axis=1
-)
+TURKEY_APARTMENT_PATH_3600_LIGHTING = transformation_args_folder_path_common / "Turkey_apartment_3600_lighting"
+TURKEY_APARTMENT_DATA_3600_LIGHTING = {
+    'training': NILMDataSet(name='Turkey_apartment_training', appliance='lighting',
+                            transformation_args_folder_path=TURKEY_APARTMENT_PATH_3600_LIGHTING),
+    'test': NILMDataSet(name='Turkey_apartment_test', appliance='lighting',
+                        transformation_args_folder_path=TURKEY_APARTMENT_PATH_3600_LIGHTING),
+}
+
 # Turkey detached house
-TURKEY_HOUSE_DATA = PhysicalInstanceDataFrame(load_pkl_file(raw_data_path / 'Turkey.pkl')['Detached House'],
-                                              obj_name='Turkey detached house', predictor_names=(), dependant_names=())
-TURKEY_HOUSE_DATA = TURKEY_HOUSE_DATA.rename(
-    {
-        'temperature': 'environmental temperature',
-        'radiation_surface': 'solar irradiance'
-    },
-    axis=1
-)
+TURKEY_HOUSE_PATH_3600_LIGHTING = transformation_args_folder_path_common / "Turkey_Detached House_3600_lighting"
+TURKEY_HOUSE_DATA_3600_LIGHTING = {
+    'training': NILMDataSet(name='Turkey_Detached House_training', appliance='lighting',
+                            transformation_args_folder_path=TURKEY_HOUSE_PATH_3600_LIGHTING),
+    'test': NILMDataSet(name='Turkey_Detached House_test', appliance='lighting',
+                        transformation_args_folder_path=TURKEY_HOUSE_PATH_3600_LIGHTING),
+}
+
 # UK DALE
-UKDALE_DATA = PhysicalInstanceDataFrame(load_pkl_file(raw_data_path / 'UKDALE.pkl'),
-                                        obj_name='UK DALE', predictor_names=(), dependant_names=())
-# JOHN MV
-john_data_set_date_start = datetime.datetime(year=2009, month=1, day=1)
-# john_data_set_date_end = datetime.datetime(year=2009, month=1, day=3)
-john_data_set_date_end = datetime.datetime(year=2010, month=1, day=1)
-JOHN_DATA = ScotlandLongerDataset("John").dataset
-JOHN_DATA = PhysicalInstanceDataFrame(
-    JOHN_DATA[np.bitwise_and(JOHN_DATA.index >= john_data_set_date_start,
-                             JOHN_DATA.index < john_data_set_date_end)],
-    obj_name='John MV', predictor_names=(), dependant_names=()
-)
-JOHN_DATA = JOHN_DATA.rename(
-    {
-        'temperature': 'environmental temperature',
-        'active power': 'main',
-    },
-    axis=1
-)
-JOHN_DATA['heating'] = np.full(JOHN_DATA.shape[0], 0)
+UK_DALE_PATH_600_HEATING = transformation_args_folder_path_common / "UKDALE_600_heating"
+UK_DALE_DATA_600_HEATING = {
+    'training': NILMDataSet(name='UKDALE_training', resolution=600, appliance='heating',
+                            transformation_args_folder_path=UK_DALE_PATH_600_HEATING),
+    'test': NILMDataSet(name='UKDALE_test', resolution=600, appliance='heating',
+                        transformation_args_folder_path=UK_DALE_PATH_600_HEATING),
+}
+UK_DALE_PATH_3600_LIGHTING = transformation_args_folder_path_common / "UKDALE_3600_lighting"
+UK_DALE_DATA_3600_LIGHTING = {
+    'training': NILMDataSet(name='UKDALE_training', resolution=3600, appliance='lighting',
+                            transformation_args_folder_path=UK_DALE_PATH_3600_LIGHTING),
+    'test': NILMDataSet(name='UKDALE_test', resolution=3600, appliance='lighting',
+                        transformation_args_folder_path=UK_DALE_PATH_3600_LIGHTING),
+}
 
 
-def lasso_fft_and_correlation(task='explore', *, data_set, save_to_buffer=True):
+# Infer path variable from data variable
+def get_path_from_data_variable(data_variable: dict) -> Path:
+    data_variable_name = [x[0] for x in globals().items() if x[1] is data_variable and x[0] != "data_variable"][0]
+    return globals()[data_variable_name.replace("DATA", "PATH")]
+
+
+def lasso_fft_and_correlation(task='explore', *, data_set=None, save_to_buffer=True):
+    if data_set is None:
+        # JOHN MV
+        john_data_set_date_start = datetime.datetime(year=2009, month=1, day=1)
+        # john_data_set_date_end = datetime.datetime(year=2009, month=1, day=3)
+        john_data_set_date_end = datetime.datetime(year=2010, month=1, day=1)
+        john_data = ScotlandLongerDataset("John").dataset
+        john_data = PhysicalInstanceDataFrame(
+            john_data[np.bitwise_and(john_data.index >= john_data_set_date_start,
+                                     john_data.index < john_data_set_date_end)],
+            obj_name='John MV', predictor_names=(), dependant_names=()
+        )
+        john_data = john_data.rename(
+            {
+                'temperature': 'environmental temperature',
+                'active power': 'main',
+            },
+            axis=1
+        )
+        john_data['heating'] = np.full(john_data.shape[0], 0)
+        data_set = john_data
+
     assert task in ('explore', 'load results')
     this_data_set = copy.deepcopy(data_set)
     # this_data_set = this_data_set.iloc[24 * 185:24 * 190 - 1]
@@ -214,43 +235,191 @@ def lasso_fft_and_correlation(task='explore', *, data_set, save_to_buffer=True):
     document.save(f'.\\{this_data_set.obj_name}_lasso_fft_and_corr.docx')
 
 
-def load_ampds2_data_set(resolution: int, mode: str = 'training'):
-    assert mode in ('training', 'test')
-    ampds2_dataset = ampds2_dataset_full_df(resolution=resolution)
-    if mode == 'training':
-        _slice = slice(0, int(len(ampds2_dataset) / 2))
-    else:
-        _slice = slice(int(len(ampds2_dataset) / 2), len(ampds2_dataset) + 1)
+def train_model(dataset: dict, *, batch_size: int, epochs=5000, task: str, save_per_epoch: int = 250):
+    assert task in ("continue training", "new training", "load results")
+    save_folder_path = get_path_from_data_variable(dataset)
 
-    ampds2_training = NILMDataSet(ampds2_dataset.iloc[_slice],
-                                  name=f'ampds2_{mode}',
-                                  cos_sin_transformed_col=('month',),
-                                  one_hot_transformed_col=('dayofweek',),
-                                  non_transformed_col=('summer_time', 'holiday'),
-                                  min_max_transformed_col=('moon_phase', 'Temp (C)', 'Rel Hum (%)', 'Stn Press (kPa)',
-                                                           'Mains', 'HPE'),
-                                  dependant_cols=('HPE',))
+    training_set_nn, _, _ = dataset['training'].windowed_dataset(datetime.timedelta(days=1), batch_size=batch_size)
+    test_set_nn, _, _ = dataset['test'].windowed_dataset(datetime.timedelta(days=1), batch_size=batch_size)
+    try_to_find_folder_path_otherwise_make_one(save_folder_path / fr'temp')
 
-    # ampds2_training.windowed_dataset(datetime.timedelta(days=1), batch_size=10)
-    return ampds2_training
+    class SaveCallback(keras.callbacks.Callback):
+        def on_epoch_end(self, epoch, logs=None):
+            if (epoch % save_per_epoch == 0) and (epoch != 0):
+                model.save(save_folder_path / fr'temp\fitting_model_epoch_{epoch}.h5')
 
-
-def model_layout(input_shape, output_dim):
     model = tf.keras.models.Sequential([
-        tf.keras.layers.Conv1D(filters=32, kernel_size=3,
+        tf.keras.layers.Conv1D(filters=128, kernel_size=3,
                                strides=1, padding="causal",
                                activation="relu",
-                               input_shape=input_shape),
-        tf.keras.layers.Bidirectional(LSTM(64, return_sequences=True)),
-        tf.keras.layers.Bidirectional(LSTM(128, return_sequences=True)),
-        tf.keras.layers.Dense(30, activation="relu"),
-        tf.keras.layers.Dense(10, activation="relu"),
-        tf.keras.layers.Dense(output_dim),
+                               input_shape=training_set_nn.element_spec[0].shape[1:]),
+        tf.keras.layers.Dropout(0.1),
+        tf.keras.layers.MaxPooling1D(pool_size=1, strides=1, padding='same'),
+        tf.keras.layers.Bidirectional(tf.keras.layers.RNN(tf.keras.layers.LSTMCell(512),
+                                                          return_sequences=True), ),
+        tf.keras.layers.Dropout(0.1),
+        tf.keras.layers.Bidirectional(tf.keras.layers.RNN(tf.keras.layers.LSTMCell(512),
+                                                          return_sequences=True)),
+        tf.keras.layers.Dropout(0.1),
+        tf.keras.layers.Dense(512, activation="relu"),
+        tf.keras.layers.Dropout(0.1),
+        tf.keras.layers.Dense(training_set_nn.element_spec[1].shape[-1]),
     ])
+    model.summary()
 
+    model.compile(optimizer=tf.keras.optimizers.Adam(), loss=keras.losses.mse, metrics=['mae'])
+    if task == "load results":
+        model.load_weights(save_folder_path / fr'fitted_model.h5')
+        return model
+    if task == "continue training":
+        existings = os.listdir(save_folder_path / "temp")
+        max_existing_epoch = max([re.findall(r"(?<=_)\d+(?=.h5)", x)[0] for x in existings])
+        model.load_weights(save_folder_path / "temp" / [x for x in existings if max_existing_epoch in x][0])
+    history = model.fit(training_set_nn, verbose=2, epochs=epochs, validation_data=test_set_nn,
+                        callbacks=[SaveCallback()])
+    model.save(save_folder_path / fr'fitted_model.h5')
     return model
 
 
+def train_model_with_attention(dataset: NILMDataSet,
+                               batch_size: int,
+                               teacher_forcing: float = 0.001):
+    dataset_nn, _, _, _ = dataset.windowed_dataset(datetime.timedelta(days=1), batch_size=batch_size)
+    output_seq_start_val = 0.
+
+    training_mode = True
+
+    encoder = TensorFlowCovBiLSTMEncoder(lstm_layer_hidden_size=64,
+                                         training_mode=training_mode)
+    decoder = TensorFlowLSTMDecoder(lstm_layer_hidden_size=64,
+                                    training_mode=training_mode,
+                                    output_feature_len=1)
+
+    # %% Optimiser and loss function
+    optimizer = tf.keras.optimizers.Adam()
+    # loss_function = tf.keras.losses.mean_absolute_error
+    loss_object = tf.keras.losses.MeanSquaredError()
+
+    def loss_function(real, pred):
+        mask = tf.math.logical_not(tf.math.equal(real, 0))
+        loss_ = loss_object(real, pred)
+
+        # mask = tf.cast(mask, dtype=loss_.dtype)
+        # loss_ *= mask  # TODO  ############?############
+
+        return tf.reduce_mean(loss_)
+
+    # %% Train step
+    @tf.function
+    def train_step(_x, _y):
+        _loss = 0
+        _encoder_hidden = encoder.initialize_h_0_c_0(_x.shape[0])
+
+        with tf.GradientTape() as tape:
+            _encoder_output, _encoder_hidden = encoder(x=_x, h_0_c_0_list=_encoder_hidden)
+            _decoder_hidden = _encoder_hidden
+            _decoder_input = tf.zeros((_y.shape[0], 1), dtype="float64") + output_seq_start_val  # -1 represent start
+            _decoder_input = tf.expand_dims(_decoder_input, 1)
+
+            for i in range(0, _y.shape[1]):
+                _predictions, _decoder_hidden, _ = decoder(_decoder_input,
+                                                           _decoder_hidden,
+                                                           _encoder_output)
+                _loss += loss_function(tf.expand_dims(_y[:, i], 1), _predictions)
+                if (_y is not None) and (tf.random.uniform((1,)) < teacher_forcing):
+                    _decoder_input = tf.expand_dims(_y[:, i], 1)
+                else:
+                    _decoder_input = _predictions
+            _batch_loss = _loss / int(_y.shape[1])
+            print(f"_batch_loss = {_batch_loss}")
+
+            variables = encoder.trainable_variables + decoder.trainable_variables
+
+            gradients = tape.gradient(_loss, variables)
+
+            optimizer.apply_gradients(zip(gradients, variables))
+
+            return _batch_loss
+
+    # %% Train
+    epochs = 1000
+    # steps_per_epoch = len(dataset_nn) // BATCH_SIZE
+
+    for epoch in range(epochs):
+        start = time.time()
+
+        total_loss = 0
+
+        for batch_number, (x, y) in enumerate(dataset_nn):
+            batch_loss = train_step(x, y)
+            total_loss += batch_loss
+
+            if batch_number % 1 == 0:
+                print('Epoch {} Batch {} Loss {:.4f}'.format(epoch + 1,
+                                                             batch_number + 1,
+                                                             batch_loss))
+        # saving (checkpoint) the model every 2 epochs
+        if (epoch + 1) % 2 == 0:
+            pass
+
+        print('Epoch {} total_loss Loss {:.4f}'.format(epoch + 1, total_loss))
+        print('Time taken for 1 epoch {} sec\n'.format(time.time() - start))
+
+
+def test_model(model_built_dataset: dict, test_dataset: dict, *,
+               test_date_time_range: Tuple[datetime.datetime, datetime.datetime],
+               plot: bool = True, batch_size: int = 100):
+    # %% Load model
+    model_built_dataset_path = get_path_from_data_variable(model_built_dataset)  # type:Path
+    model = tf.keras.models.load_model(model_built_dataset_path / "fitted_model.h5")
+
+    # %% Prepare test set
+    test_dataset = test_dataset['test'][test_date_time_range]  # type: NILMDataSet
+    test_set_origin = test_dataset.data
+    test_set_nn, time_stamp_ndarray, predictor_names, dependant_names = test_dataset.windowed_dataset(
+        datetime.timedelta(days=1), batch_size=batch_size)
+
+    # %% Test
+    gradients = np.full((*time_stamp_ndarray.shape, predictor_names.__len__()), np.nan)
+    predictions = np.full((*time_stamp_ndarray.shape, dependant_names.__len__()), np.nan)
+    for i, (x, y) in enumerate(test_set_nn):
+        # Predict and calculate gradient
+        x_var = tf.Variable(x, dtype="float64")
+        with tf.GradientTape() as tape:
+            this_prediction_nn = model(x_var)
+        this_gradients = tape.gradient(this_prediction_nn, x_var).cpu().numpy()
+        gradients[i * batch_size:(i + 1) * batch_size] = this_gradients
+        # Inverse transform
+        this_prediction = test_dataset.inverse_transform(this_prediction_nn, dependant_names)
+        predictions[i * batch_size:(i + 1) * batch_size] = this_prediction
+    # %% Analyse gradient
+    gradient_analyser_obj = GradientsAnalyser(gradients, predictor_names)
+    new_gradients, new_predictor_names = gradient_analyser_obj.aggregate_over_all_samples(apply_abs_op=True)
+    gradient_analyser_obj.plot(new_gradients, new_predictor_names, plot_individual_steps=False)
+
+    # ax = series(model.predict(list(test_set.as_numpy_iterator())[0][0]).flatten())
+    # ax = series(this_output.flatten(), ax=ax)
+
+
 if __name__ == '__main__':
-    pass
-    lasso_fft_and_correlation(task='explore', data_set=JOHN_DATA)
+    # tt, _, _ = AMPDS2_DATA_600_HEATING['training'].windowed_dataset(datetime.timedelta(days=1), batch_size=99)
+    # bb = iter(tt)
+    data_list = [AMPDS2_DATA_600_HEATING,
+                 UK_DALE_DATA_600_HEATING]
+    # for this_data, this_path in zip(data_list, path_list):
+    #     if not try_to_find_file(this_path / r'fitted_model.h5'):
+    #         fitted_model = train_model(this_data,
+    #                                                     this_path,
+    #                                                     batch_size=200, epochs=5000)
+    # fitted_model = train_model(TURKEY_APARTMENT_DATA_3600_LIGHTING,
+    #                            batch_size=200, epochs=5000, task='')
+
+    # fitted_model = train_model(TURKEY_HOUSE_DATA_3600_LIGHTING,
+    #                                             TURKEY_HOUSE_PATH_3600_LIGHTING,
+    #                                             batch_size=200, epochs=5000)
+
+    # fitted_model = train_model(AMPDS2_DATA_600_HEATING,
+    #                            AMPDS2_PATH_600_HEATING,
+    #                            batch_size=200, epochs=5000, task="load results")
+    test_model(UK_DALE_DATA_600_HEATING, AMPDS2_DATA_600_HEATING,
+               test_date_time_range=(datetime.datetime(2013, 11, 1), datetime.datetime(2013, 11, 2)))

@@ -832,24 +832,45 @@ class NILMDataSet(DeepLearningDataSet):
         if 'Ampds2' in name:
             original_data_set = load_pkl_file(project_path_ / (r"Data\Raw\for_Energies_Research_paper_2020\\" +
                                                                f"Ampds2_resolution_{resolution}.pkl"))
-            mask = original_data_set.index < datetime.datetime(2013, 4, 1)
+            if 'training' in name:
+                mask = np.bitwise_and(original_data_set.index >= datetime.datetime(2012, 4, 1),
+                                      original_data_set.index < datetime.datetime(2013, 4, 1))
+            else:
+                mask = np.bitwise_and(original_data_set.index >= datetime.datetime(2013, 4, 1),
+                                      original_data_set.index < datetime.datetime(2014, 3, 31))
+
         elif 'UKDALE' in name:
             original_data_set = load_pkl_file(project_path_ / (r"Data\Raw\for_Energies_Research_paper_2020\\" +
                                                                f"UKDALE_{resolution}.pkl"))
-            mask = original_data_set.index < datetime.datetime(2016, 4, 25)
+            if 'training' in name:
+                mask = np.bitwise_and(original_data_set.index >= datetime.datetime(2013, 1, 1),
+                                      original_data_set.index < datetime.datetime(2016, 4, 25))
+            else:
+                mask = np.bitwise_and(original_data_set.index >= datetime.datetime(2016, 4, 25),
+                                      original_data_set.index < datetime.datetime(2017, 4, 26))
+
         elif 'Turkey_apartment' in name:
             original_data_set = load_pkl_file(project_path_ / r"Data\Raw\for_Energies_Research_paper_2020\Turkey.pkl")
             original_data_set = original_data_set['Apartment']
-            mask = original_data_set.index < datetime.datetime(2018, 10, 29)
+            if 'training' in name:
+                mask = np.bitwise_and(original_data_set.index >= datetime.datetime(2017, 11, 8),
+                                      original_data_set.index < datetime.datetime(2018, 10, 29))
+            else:
+                mask = np.bitwise_and(original_data_set.index >= datetime.datetime(2018, 10, 29),
+                                      original_data_set.index < datetime.datetime(2018, 11, 21))
         elif 'Turkey_Detached House' in name:
             original_data_set = load_pkl_file(project_path_ / r"Data\Raw\for_Energies_Research_paper_2020\Turkey.pkl")
             original_data_set = original_data_set['Detached House']
-            mask = original_data_set.index < datetime.datetime(2018, 10, 29)
+            if 'training' in name:
+                mask = np.bitwise_and(original_data_set.index >= datetime.datetime(2017, 11, 1),
+                                      original_data_set.index < datetime.datetime(2018, 10, 29))
+            else:
+                mask = np.bitwise_and(original_data_set.index >= datetime.datetime(2018, 10, 29),
+                                      original_data_set.index < datetime.datetime(2018, 11, 29))
 
         else:
             raise FileNotFoundError
-        if 'test' in name:
-            mask = ~mask
+
         super(NILMDataSet, self).__init__(
             original_data_set=original_data_set[mask],
             name=name + f"_{resolution}_{appliance}",

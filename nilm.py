@@ -1,5 +1,5 @@
 from Regression_Analysis.DeepLearning_Class import StackedBiLSTM, GRUEncoderDecoderWrapper, GRUEncoder, \
-    GRUDecoder, TensorFlowLSTMDecoder, TensorFlowLSTMEncoder, TensorFlowAttention
+    GRUDecoder, TensorFlowLSTMDecoder, TensorFlowCovBiLSTMEncoder, TensorFlowBahdanauAttention
 import pandas as pd
 from pandas import DataFrame
 from Ploting.fast_plot_Func import *
@@ -139,9 +139,9 @@ def energies_paper_train_tf_model_for_ampds2_dataset(model_save_path: Path):
     tf_training_set = tf.data.Dataset.from_generator(training_set_gen, (np.float32, np.float32))
     tf_training_set = tf_training_set.batch(batch_size=batch_size, drop_remainder=False)
 
-    tf_lstm_encoder = TensorFlowLSTMEncoder(hidden_size=32,
-                                            training_mode=True)
-    tf_lstm_decoder = TensorFlowLSTMDecoder(hidden_size=32,
+    tf_lstm_encoder = TensorFlowCovBiLSTMEncoder(lstm_layer_hidden_size=32,
+                                                 training_mode=True)
+    tf_lstm_decoder = TensorFlowLSTMDecoder(lstm_layer_hidden_size=32,
                                             training_mode=True,
                                             output_feature_len=2)
 
