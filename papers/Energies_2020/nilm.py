@@ -1,11 +1,10 @@
-from Regression_Analysis.DeepLearning_Class import StackedBiLSTM, GRUEncoderDecoderWrapper, GRUEncoder, \
-    GRUDecoder, TensorFlowLSTMDecoder, TensorFlowCovBiLSTMEncoder, TensorFlowBahdanauAttention
+from Regression_Analysis.DeepLearning_Class import StackedBiLSTM, TensorFlowLSTMDecoder, TensorFlowCovBiLSTMEncoder
 import pandas as pd
 from pandas import DataFrame
 from Ploting.fast_plot_Func import *
 from project_utils import project_path_
-from prepare_datasets import get_training_set_and_test_set_for_ampds2_dataset, NILMTorchDatasetForecast, \
-    load_ampds2_or_ukdale_weather, NILMTorchDataset
+from papers.Energies_2020.prepare_datasets import get_training_set_and_test_set_for_ampds2_dataset, \
+    NILMTorchDatasetForecast, load_ampds2_or_ukdale_weather
 from nilmtk.legacy.disaggregate import CombinatorialOptimisation, FHMM
 from pathlib import Path
 from File_Management.path_and_file_management_Func import try_to_find_file, try_to_find_folder_path_otherwise_make_one
@@ -15,13 +14,10 @@ from torch.utils.data import DataLoader
 import torch
 from torch.nn.functional import mse_loss
 from workalendar.america import Canada
-import datetime
 import time
 import re
-from Writting.utils import put_cached_png_into_a_docx
 from typing import List
 import os
-import copy
 
 
 # os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':16:8'
@@ -418,7 +414,7 @@ def energies_paper_train_nilm_models_for_ampds2_dataset(top_n: int = 3):
     training_set, test_set, _ = get_training_set_and_test_set_for_ampds2_dataset()
     top_n_train_elec = training_set.select_using_appliances(original_name=['HPE', 'FRE', 'CDE'])
     # 模型save的路径
-    models_path = Path('../Data/Results/Energies_paper/Ampds2')
+    models_path = Path('../../../Data/Results/Energies_paper/Ampds2')
     models_path.mkdir(parents=True, exist_ok=True)
     # 训练所有模型
     models = {'CO': CombinatorialOptimisation(), 'FHMM': FHMM()}

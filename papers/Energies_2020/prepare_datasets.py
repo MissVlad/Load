@@ -870,15 +870,22 @@ class NILMDataSet(DeepLearningDataSet):
 
         else:
             raise FileNotFoundError
-
+        # Remove unused cols
+        cos_sin_transformed_col = ('month', 'dayofweek')
+        min_max_transformed_col = ('mains', 'temperature', 'precipitation', 'snowfall', 'snow_mass', 'air_density',
+                                   'radiation_surface', 'wind speed', appliance)
+        non_transformed_col = ('holiday', 'summer_time', 'moon_phase', 'cloud_cover')
+        considered_cols_list = reduce(
+            lambda a, b: a + b, [x for x in (cos_sin_transformed_col, min_max_transformed_col, non_transformed_col)]
+        )
+        original_data_set = original_data_set.loc[:, considered_cols_list]
+        # super call
         super(NILMDataSet, self).__init__(
             original_data_set=original_data_set[mask],
             name=name + f"_{resolution}_{appliance}",
-            cos_sin_transformed_col=('month',),
-            min_max_transformed_col=('mains', 'temperature', 'precipitation', 'snowfall', 'snow_mass', 'air_density',
-                                     'radiation_surface', 'wind speed', appliance),
-            one_hot_transformed_col=('dayofweek',),
-            non_transformed_col=('holiday', 'summer_time', 'moon_phase', 'cloud_cover'),
+            cos_sin_transformed_col=cos_sin_transformed_col,
+            min_max_transformed_col=min_max_transformed_col,
+            non_transformed_col=non_transformed_col,
             dependant_cols=(appliance,),
             transformation_args_folder_path=transformation_args_folder_path,
             stacked_shift_col=kwargs.get('stacked_shift_col', ()),  # Firstly, do sensitivity analysis, and back
@@ -908,7 +915,7 @@ if __name__ == '__main__':
     # UKDALE_3600.loc[UKDALE_3600.loc[:, 'lighting'] > 200, 'lighting'] = np.nan
     # save_pkl_file(project_path_ / rf"Data\Raw\for_Energies_Research_paper_2020\UKDALE_{3600}.pkl", UKDALE_3600)
     #
-    Turkey = load_pkl_file(project_path_ / r"Data\Raw\for_Energies_Research_paper_2020\Turkey.pkl")['Detached House']
+    Turkey = load_pkl_file(project_path_ / r"Data\Raw\for_Energies_Research_paper_2020\Turkey.pkl")['Apartment']
 
     # %% Test codes, please ignore
     # Ampds2 = NILMDataSet(name='Ampds2_training', resolution=600,  appliance='heating',
