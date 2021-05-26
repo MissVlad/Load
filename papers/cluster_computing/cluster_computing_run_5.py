@@ -6,7 +6,7 @@ cwd = Path().cwd().parent
 spec = spec_from_file_location("Energies_2020", cwd / 'Energies_2020/stage_fft.py')
 foo = module_from_spec(spec)
 spec.loader.exec_module(foo)
-foo.make_report("JOHN", 'temperature')
+foo.get_freq_corr_hst_and_sum_of_sel_freq("UKDALE", "solar")
 
 """
 if __name__ == '__main__':

@@ -284,7 +284,7 @@ def energies_paper_fft_correlation():
                                                          this_bus.dataset[['temperature']])
         bivariate_time_series = WindowedTimeSeries({'main': bivariate_time_series['temperature'],
                                                     'vice': bivariate_time_series['active power']},
-                                                   window_length=datetime.timedelta(days=1))
+                                                   window_size=datetime.timedelta(days=1))
         for i, this_day in enumerate(bivariate_time_series):
             """
             目前只考虑day7, day189

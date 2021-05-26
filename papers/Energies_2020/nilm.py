@@ -435,6 +435,7 @@ def energies_paper_train_nilm_models_for_ampds2_dataset(top_n: int = 3):
 
 
 if __name__ == '__main__':
+    pass
     # tt = energies_paper_load_ampds2_dataset_train_np_and_test_np()
     # for _sample_period in (60, 60 * 30):
     # for this_type in ('Lighting',):
@@ -466,7 +467,7 @@ if __name__ == '__main__':
     # energies_paper_prepare_dataset_for_torch_model_for_ampds2_dataset(appliance_original_name=['HPE'],
     #                                                                   sample_period=1800)
 
-    _sample_period = 300
+    # _sample_period = 300
     # energies_paper_train_torch_model_for_ampds2_dataset(
     #     appliance_original_name='HPE',
     #     model_save_path=Path(project_path_) / 'Data/Results/Energies_paper/Ampds2/lstm/forecast/input_21_days/HPE_IN/'
@@ -476,14 +477,14 @@ if __name__ == '__main__':
     #                                                    f'HPE_IN/HPE_and_total_{_sample_period}_transform_args.pkl'
     # )
 
-    energies_paper_test_torch_model_for_ampds2_dataset(
-        appliance_original_name='HPE',
-        model_save_path=Path(project_path_) / 'Data/Results/Energies_paper/Ampds2/lstm/forecast/input_21_days/'
-                                              f'HPE_and_total_{_sample_period}.pkl',
-        sample_period=_sample_period,
-        transform_args_file_path=Path(project_path_) / 'Data/Results/Energies_paper/Ampds2/lstm/forecast/input_21_days/'
-                                                       f'HPE_and_total_{_sample_period}_transform_args.pkl'
-    )
+    # energies_paper_test_torch_model_for_ampds2_dataset(
+    #     appliance_original_name='HPE',
+    #     model_save_path=Path(project_path_) / 'Data/Results/Energies_paper/Ampds2/lstm/forecast/input_21_days/'
+    #                                           f'HPE_and_total_{_sample_period}.pkl',
+    #     sample_period=_sample_period,
+    #     transform_args_file_path=Path(project_path_) / 'Data/Results/Energies_paper/Ampds2/lstm/forecast/input_21_days/'
+    #                                                    f'HPE_and_total_{_sample_period}_transform_args.pkl'
+    # )
 
     # energies_paper_train_tf_model_for_ampds2_dataset(
     #     Path(project_path_) / 'Data/Results/Energies_paper/Ampds2/lstm/forecast/input_week/'

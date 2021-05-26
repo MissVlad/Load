@@ -3,6 +3,8 @@ import os
 from abc import ABCMeta, abstractmethod
 from pathlib import Path
 from typing import Tuple
+
+import numpy as np
 import pandas as pd
 from itertools import chain
 from scipy.io import loadmat
@@ -22,6 +24,7 @@ from Data_Preprocessing.TruncatedOrCircularToLinear_Class import CircularToLinea
 from functools import reduce
 import math
 import re
+from Regression_Analysis.DataSet_Class import DeepLearningDataSet
 
 try:
     from nilmtk import DataSet, MeterGroup
@@ -44,7 +47,6 @@ try:
     from workalendar.europe import UnitedKingdom, Turkey
     from pyorbital.moon_phase import moon_phase
     import tensorflow as tf
-    from Regression_Analysis.DataSet_Class import DeepLearningDataSet
 
 
     class NILMTorchDataset(TorchDataSet):
@@ -269,6 +271,8 @@ try:
         def _transform(self, transform_args_file_path, mode='forecast') \
                 -> Tuple[torch.tensor, torch.tensor, pd.DataFrame]:
             return super(NILMTorchDatasetForecast, self)._transform(transform_args_file_path, mode='forecast')
+
+
 
 
 except ModuleNotFoundError:
@@ -565,17 +569,26 @@ def ampds2_dataset_full_df(resolution: int) -> pd.DataFrame:
         heating_df = next(ampds2.select_using_appliances(
             original_name='HPE').meters[0].load(ac_type='active', sample_period=resolution))
         heating_df = heating_df.droplevel('physical_quantity', axis=1)  # type: DataFrame
-        heating_df.rename(columns={'active': 'HPE'}, inplace=True)
+        heating_df.rename(columns={'active': 'heating'}, inplace=True)
 
         mains_df = next(ampds2.mains().load(
             ac_type='active', sample_period=resolution)).droplevel('physical_quantity', axis=1)  # type: DataFrame
-        mains_df.rename(columns={mains_df.columns[0]: 'mains'}, inplace=True)
+        mains_df.rename(columns={mains_df.columns[0]: 'active power'}, inplace=True)
+
+        q_df = next(ampds2.mains().load(
+            ac_type='reactive', sample_period=resolution)).droplevel('physical_quantity', axis=1)  # type: DataFrame
+        q_df.rename(columns={q_df.columns[0]: 'reactive power'}, inplace=True)
+
         mains_df = _add_dst_holiday_info_etc(mains_df, Canada(), -8)
 
         ampds2_weather_df = load_ampds2_or_ukdale_weather(name="ampds2")
-
+        ampds2_weather_df = ampds2_weather_df[['temperature', 'radiation_surface']]
+        ampds2_weather_df.rename({'radiation_surface': 'solar'}, axis=1, inplace=True)
         full_data = pd.merge(mains_df, ampds2_weather_df, how="left", left_index=True, right_index=True)
+
         full_data.loc[:, "heating"] = heating_df.values.flatten()
+        full_data.loc[:, "reactive power"] = q_df.values.flatten()
+
         full_data = full_data.interpolate('time')
         full_data.dtype = float
 
@@ -611,7 +624,9 @@ class ScotlandDataset(metaclass=ABCMeta):
         raw_data = pd.DataFrame(data={'holiday': holiday_ndarray,
                                       'BST': bst_ndarray,
                                       'active power': self.load_active_power_mat(),
-                                      'temperature': self.get_temperature()},
+                                      'temperature': self.get_temperature(),
+                                      'reactive power': self.load_reactive_power_mat(),
+                                      'solar': self.get_solar()},
                                 index=time_index)
         return raw_data
 
@@ -663,6 +678,13 @@ class ScotlandDataset(metaclass=ABCMeta):
         pass
 
     @abstractmethod
+    def load_reactive_power_mat(self) -> ndarray:
+        """
+        载入Data_Q_modified.mat或者Data_P.mat
+        """
+        pass
+
+    @abstractmethod
     def load_ts_mat(self) -> ndarray:
         """
         载入Data_ts_modified.mat或者Data_ts.mat
@@ -676,6 +698,10 @@ class ScotlandDataset(metaclass=ABCMeta):
         """
         pass
 
+    @abstractmethod
+    def get_solar(self) -> ndarray:
+        pass
+
 
 class ScotlandLongerDataset(ScotlandDataset):
     """
@@ -684,7 +710,6 @@ class ScotlandLongerDataset(ScotlandDataset):
 
     def __init__(self, name: str):
         """
-        需要注意的是闰年2月29号没有记录，active power全部用0去填充的
         """
         if name not in ('Drum', 'John'):
             raise Exception('Wrong name')
@@ -693,11 +718,17 @@ class ScotlandLongerDataset(ScotlandDataset):
     def load_active_power_mat(self) -> ndarray:
         return loadmat(self.matlab_mat_file_folder / 'Data_P_modified.mat')['P'].flatten()
 
+    def load_reactive_power_mat(self) -> ndarray:
+        return loadmat(self.matlab_mat_file_folder / 'Data_Q_modified.mat')['Q'].flatten()
+
     def load_ts_mat(self) -> ndarray:
         return loadmat(self.matlab_mat_file_folder / 'Data_ts_modified.mat')['ts']
 
     def get_temperature(self) -> ndarray:
         return loadmat(self.matlab_mat_file_folder / 'Data_temperature_modified.mat')['temperature'].flatten()
+
+    def get_solar(self) -> ndarray:
+        return loadmat(self.matlab_mat_file_folder / 'Data_solar_modified.mat')['solar'].flatten()
 
 
 class ScotlandShorterDataset(ScotlandDataset):
@@ -718,6 +749,12 @@ class ScotlandShorterDataset(ScotlandDataset):
 
     def get_temperature(self) -> ndarray:
         return loadmat(self.matlab_mat_file_folder / 'Data_temperature.mat')['temperature'].flatten()
+
+    def load_reactive_power_mat(self) -> ndarray:
+        pass
+
+    def get_solar(self) -> ndarray:
+        pass
 
 
 def load_turkey_dataset():
@@ -789,16 +826,22 @@ def pre_call_(sample_period=60):
                                                                  fr"UKDALE_{sample_period}.pkl"))
     def func():
         _, _, uk_dale = load_datasets()
+        # uk_dale_mains = uk_dale.buildings[1].elec.mains().power_series_all_data(sample_period=sample_period)
+        uk_dale_mains = next(uk_dale.buildings[1].elec.mains().power_series(ac_type='active',
+                                                                            sample_period=sample_period))
+        uk_dale_app = next(uk_dale.buildings[1].elec.mains().power_series(ac_type='apparent',
+                                                                          sample_period=sample_period))
+        uk_dale_q = pd.Series(np.sqrt(uk_dale_app.values ** 2 - uk_dale_mains.values ** 2),
+                              index=uk_dale_mains.index)
 
         uk_dale_lighting = next(uk_dale.buildings[1].elec.select_using_appliances(category='lighting').load(
             sample_period=sample_period))[('power', 'active')]
-        uk_dale_heating = next(uk_dale.buildings[1].elec.select_using_appliances(category='heating').load(
-            sample_period=sample_period))[('power', 'active')]
-        uk_dale_mains = uk_dale.buildings[1].elec.mains().power_series_all_data(sample_period=sample_period)
+        # uk_dale_heating = next(uk_dale.buildings[1].elec.select_using_appliances(category='heating').load(
+        #     sample_period=sample_period))[('power', 'active')]
 
         uk_dale_df = pd.DataFrame()
-        names = ('lighting', 'heating', 'mains')
-        for i, this_df in enumerate((uk_dale_lighting, uk_dale_heating, uk_dale_mains)):
+        names = ('lighting', 'active power', 'reactive power')
+        for i, this_df in enumerate((uk_dale_lighting, uk_dale_mains, uk_dale_q)):
             this_df = this_df[~this_df.index.duplicated(keep='first')]
             this_df = pd.DataFrame(data=this_df.values,
                                    index=this_df.index,
@@ -811,6 +854,8 @@ def pre_call_(sample_period=60):
 
         uk_dale_df = _add_dst_holiday_info_etc(uk_dale_df, UnitedKingdom(), 0)
         weather = load_ampds2_or_ukdale_weather(name='uk dale')
+        weather = weather[['temperature', 'radiation_surface']]
+        weather.rename({'radiation_surface': 'solar'}, axis=1, inplace=True)
         full_data = pd.merge(uk_dale_df, weather, how="left", left_index=True, right_index=True)
         full_data = full_data.interpolate('time')
         full_data.dtype = float
@@ -829,28 +874,50 @@ class NILMDataSet(DeepLearningDataSet):
         assert ('training' in name) or ('test' in name)
         assert appliance in ('heating', 'lighting')
 
+        def _get_datetime_div(_original_data_set):
+            first = copy.deepcopy(_original_data_set.index[0])
+            last = _original_data_set.index[-1]
+            total_length = last - first
+            division = first + datetime.timedelta(seconds=total_length.total_seconds() * 0.9)
+            division = datetime.datetime(division.year,
+                                         division.month,
+                                         division.day + 1)
+            for ele in ["first", "division", "last"]:
+                source_code = f"""\
+                if {ele} != datetime.datetime({ele}.year, {ele}.month, {ele}.day):
+                    temp = {ele} + datetime.timedelta(days=1) if {ele} != last else {ele} - datetime.timedelta(days=1)
+                    {ele}_new = datetime.datetime(temp.year, temp.month, temp.day)
+                """
+                indent = re.search(r"\w", source_code.split("\n")[0]).regs[0][0]
+                source_code = "\n".join([x[indent:] for x in source_code.split("\n")])
+                exec(source_code)
+
+            return locals()["first_new"], division, locals()["last_new"]
+
         if 'Ampds2' in name:
             original_data_set = load_pkl_file(project_path_ / (r"Data\Raw\for_Energies_Research_paper_2020\\" +
                                                                f"Ampds2_resolution_{resolution}.pkl"))
+            datetime_div = _get_datetime_div(original_data_set)
             if 'training' in name:
-                mask = np.bitwise_and(original_data_set.index >= datetime.datetime(2012, 4, 1),
-                                      original_data_set.index < datetime.datetime(2013, 4, 1))
+                mask = np.bitwise_and(datetime_div[0] <= original_data_set.index,
+                                      original_data_set.index < datetime_div[1])
             else:
-                mask = np.bitwise_and(original_data_set.index >= datetime.datetime(2013, 4, 1),
-                                      original_data_set.index < datetime.datetime(2014, 3, 31))
-
+                mask = np.bitwise_and(datetime_div[1] <= original_data_set.index,
+                                      original_data_set.index < datetime_div[2])
         elif 'UKDALE' in name:
             original_data_set = load_pkl_file(project_path_ / (r"Data\Raw\for_Energies_Research_paper_2020\\" +
                                                                f"UKDALE_{resolution}.pkl"))
+            datetime_div = _get_datetime_div(original_data_set)
             if 'training' in name:
-                mask = np.bitwise_and(original_data_set.index >= datetime.datetime(2013, 1, 1),
-                                      original_data_set.index < datetime.datetime(2016, 4, 25))
+                mask = np.bitwise_and(datetime_div[0] <= original_data_set.index,
+                                      original_data_set.index < datetime_div[1])
             else:
-                mask = np.bitwise_and(original_data_set.index >= datetime.datetime(2016, 4, 25),
-                                      original_data_set.index < datetime.datetime(2017, 4, 26))
+                mask = np.bitwise_and(datetime_div[1] <= original_data_set.index,
+                                      original_data_set.index < datetime_div[2])
 
         elif 'Turkey_apartment' in name:
-            original_data_set = load_pkl_file(project_path_ / r"Data\Raw\for_Energies_Research_paper_2020\Turkey.pkl")
+            original_data_set = load_pkl_file(
+                project_path_ / r"Data\Raw\for_Energies_Research_paper_2020\Turkey.pkl")
             original_data_set = original_data_set['Apartment']
             if 'training' in name:
                 mask = np.bitwise_and(original_data_set.index >= datetime.datetime(2017, 11, 8),
@@ -859,7 +926,8 @@ class NILMDataSet(DeepLearningDataSet):
                 mask = np.bitwise_and(original_data_set.index >= datetime.datetime(2018, 10, 29),
                                       original_data_set.index < datetime.datetime(2018, 11, 21))
         elif 'Turkey_Detached House' in name:
-            original_data_set = load_pkl_file(project_path_ / r"Data\Raw\for_Energies_Research_paper_2020\Turkey.pkl")
+            original_data_set = load_pkl_file(
+                project_path_ / r"Data\Raw\for_Energies_Research_paper_2020\Turkey.pkl")
             original_data_set = original_data_set['Detached House']
             if 'training' in name:
                 mask = np.bitwise_and(original_data_set.index >= datetime.datetime(2017, 11, 1),
@@ -871,7 +939,7 @@ class NILMDataSet(DeepLearningDataSet):
         else:
             raise FileNotFoundError
         # Remove unused cols
-        cos_sin_transformed_col = ('month', 'dayofweek')
+        cos_sin_transformed_col = ('month', 'dayofweek', 'hour', 'minute')
         min_max_transformed_col = ('mains', 'temperature', 'precipitation', 'snowfall', 'snow_mass', 'air_density',
                                    'radiation_surface', 'wind speed', appliance)
         non_transformed_col = ('holiday', 'summer_time', 'moon_phase', 'cloud_cover')
@@ -899,13 +967,14 @@ if __name__ == '__main__':
     # %% Execute in NILM_Project, preparing
     # load_turkey_dataset()
     # ampds2_dataset_, uk_dale_dataset_ = pre_call_(60)
-    # ampds2_dataset_, uk_dale_dataset_ = pre_call_(600)
+    resol = 1800
+    ampds2_dataset_, uk_dale_dataset_ = pre_call_(resol)
     # ampds2_dataset_, uk_dale_dataset_ = pre_call_(3600)
 
     # %% Check and remove outliers
-    Ampds2_600 = load_pkl_file(project_path_ / (r"Data\Raw\for_Energies_Research_paper_2020\\" +
-                                                f"Ampds2_resolution_{600}.pkl"))
-    UKDALE_600 = load_pkl_file(project_path_ / rf"Data\Raw\for_Energies_Research_paper_2020\UKDALE_{600}.pkl")
+    Ampds2 = load_pkl_file(project_path_ / (r"Data\Raw\for_Energies_Research_paper_2020\\" +
+                                            f"Ampds2_resolution_{resol}.pkl"))
+    UKDALE = load_pkl_file(project_path_ / rf"Data\Raw\for_Energies_Research_paper_2020\UKDALE_{resol}.pkl")
     # UKDALE_600.loc[UKDALE_600.loc[:, 'lighting'] > 500, 'lighting'] = np.nan
     # save_pkl_file(project_path_ / rf"Data\Raw\for_Energies_Research_paper_2020\UKDALE_{600}.pkl", UKDALE_600)
     #
@@ -915,7 +984,7 @@ if __name__ == '__main__':
     # UKDALE_3600.loc[UKDALE_3600.loc[:, 'lighting'] > 200, 'lighting'] = np.nan
     # save_pkl_file(project_path_ / rf"Data\Raw\for_Energies_Research_paper_2020\UKDALE_{3600}.pkl", UKDALE_3600)
     #
-    Turkey = load_pkl_file(project_path_ / r"Data\Raw\for_Energies_Research_paper_2020\Turkey.pkl")['Apartment']
+    # Turkey = load_pkl_file(project_path_ / r"Data\Raw\for_Energies_Research_paper_2020\Turkey.pkl")['Apartment']
 
     # %% Test codes, please ignore
     # Ampds2 = NILMDataSet(name='Ampds2_training', resolution=600,  appliance='heating',
